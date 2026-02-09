@@ -242,6 +242,18 @@ jobs:
 
       - name: Verify platform packages
         run: |
+          echo "=== 当前工作目录结构 ==="
+          ls -la
+          echo ""
+          echo "=== packages 目录内容 ==="
+          ls -la packages/ || echo "packages 目录不存在"
+          echo ""
+          echo "=== 检查是否有额外的 packages 目录层级 ==="
+          if [ -d "packages/packages" ]; then
+            echo "发现 packages/packages 双重目录！"
+            ls -la packages/packages/
+          fi
+          echo ""
           echo "=== 验证平台包目录 ==="
           for pkg in packages/frps-* packages/frpc-*; do
             if [ -d "$pkg" ] && [ "$pkg" != "packages/frps" ] && [ "$pkg" != "packages/frpc" ]; then
