@@ -2,10 +2,13 @@
 
 /**
  * 版本管理脚本
- * 用法: node scripts/version.js [newversion]
+ * 用法: npm version [patch|minor|major|x.y.z]
  *
- * 此脚本作为 npm version 的钩子，在 npm version 升级版本后同步更新子包版本
- * 同时也支持独立的版本升级命令
+ * 此脚本作为 npm version 的钩子，在 npm version 升级版本后：
+ * 1. 同步更新子包版本
+ * 2. 更新 CHANGELOG.md
+ *
+ * 完成后需要手动提交并推送，GitHub Actions 会在发布成功后创建 tag
  *
  * 示例:
  *   npm version patch       # 0.0.1 -> 0.0.2
@@ -108,6 +111,11 @@ async function main() {
   await updateChangelog(newVersion, changes);
 
   console.log('\n版本同步完成！');
+  console.log('\n请执行以下命令提交并推送：');
+  console.log(`  git add -A`);
+  console.log(`  git commit -m "chore: bump version to ${newVersion}"`);
+  console.log(`  git push origin main`);
+  console.log('\n推送后 GitHub Actions 将自动发布并创建 tag');
 }
 
 main().catch(console.error);
