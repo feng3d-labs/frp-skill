@@ -1,0 +1,20 @@
+{
+  "name": "frp_test",
+  "version": "1.0.0",
+  "description": "使用 [frp](https://github.com/fatedier/frp) 实现内网穿透的 Claude Code Skill，将本地服务暴露到公网访问。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wardenfeng/frp-skill.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/wardenfeng/frp-skill/issues"
+  },
+  "homepage": "https://github.com/wardenfeng/frp-skill#readme"
+}
