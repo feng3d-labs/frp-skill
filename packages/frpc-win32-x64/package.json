@@ -4,9 +4,9 @@
   "description": "frpc windows x64 二进制文件",
   "type": "module",
   "main": "./frpc.exe",
-  "os": ["win32"],
-  "cpu": ["x64"],
   "author": "feng3d",
   "license": "MIT",
-  "files": ["frpc.exe"]
+  "files": [
+    "frpc.exe"
+  ]
 }

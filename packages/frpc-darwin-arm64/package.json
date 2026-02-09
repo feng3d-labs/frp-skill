@@ -4,9 +4,9 @@
   "description": "frpc darwin arm64 二进制文件",
   "type": "module",
   "main": "./frpc",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
   "author": "feng3d",
   "license": "MIT",
-  "files": ["frpc"]
+  "files": [
+    "frpc"
+  ]
 }

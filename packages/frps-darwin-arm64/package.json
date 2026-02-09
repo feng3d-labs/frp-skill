@@ -4,9 +4,9 @@
   "description": "frps darwin arm64 二进制文件",
   "type": "module",
   "main": "./frps",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
   "author": "feng3d",
   "license": "MIT",
-  "files": ["frps"]
+  "files": [
+    "frps"
+  ]
 }

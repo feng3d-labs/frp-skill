@@ -4,9 +4,9 @@
   "description": "frpc linux arm64 二进制文件",
   "type": "module",
   "main": "./frpc",
-  "os": ["linux"],
-  "cpu": ["arm64"],
   "author": "feng3d",
   "license": "MIT",
-  "files": ["frpc"]
+  "files": [
+    "frpc"
+  ]
 }

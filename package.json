@@ -24,7 +24,9 @@
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",
     "vitest": "^1.6.0",
-    "@vitest/coverage-v8": "^1.6.0"
+    "@vitest/coverage-v8": "^1.6.0",
+    "tar": "^6.0.0",
+    "unzipper": "^0.12.0"
   },
   "engines": {
     "node": ">=18.0.0"

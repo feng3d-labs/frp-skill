@@ -4,9 +4,9 @@
   "description": "frps windows x64 二进制文件",
   "type": "module",
   "main": "./frps.exe",
-  "os": ["win32"],
-  "cpu": ["x64"],
   "author": "feng3d",
   "license": "MIT",
-  "files": ["frps.exe"]
+  "files": [
+    "frps.exe"
+  ]
 }
