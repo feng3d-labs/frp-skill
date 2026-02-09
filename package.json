@@ -34,7 +34,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wardenfeng/frp-skill.git"
+    "url": "git+https://github.com/feng3d-labs/frp-skill.git"
   },
   "author": "feng3d",
   "license": "MIT"

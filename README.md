@@ -36,7 +36,7 @@ frpc --server example.com --local-port 8080 --remote-port 8080
 本仓库同时也是 [Claude Code](https://claude.com/claude-code) 的 Skill，可以通过以下方式安装：
 
 ```bash
-npx skills add wardenfeng/frp-skill
+npx skills add feng3d-labs/frp-skill
 ```
 
 安装后可以在 Claude Code 中直接描述需求，例如：

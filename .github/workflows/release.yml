@@ -67,7 +67,7 @@ jobs:
                   changes = changes[:10000] + '...'
               print(f'<<EOF_CONTENT\n{changes}\nEOF_CONTENT', end='')
           else:
-              print(f'## [{VERSION}]\n\n请查看 [CHANGELOG](https://github.com/wardenfeng/frp-skill/blob/main/CHANGELOG.md) 获取完整变更记录。', end='')
+              print(f'## [{VERSION}]\n\n请查看 [CHANGELOG](https://github.com/feng3d-labs/frp-skill/blob/main/CHANGELOG.md) 获取完整变更记录。', end='')
           EOF
 
   # 发布前测试 - 在所有平台验证
