@@ -121,6 +121,8 @@ jobs:
       - name: Download frp binaries
         run: |
           VERSION="${{ needs.check-version.outputs.new-version }}"
+          # 使用固定的 frp 版本（与 frp 官方发布版本对齐）
+          FRP_VERSION="0.67.0"
 
           # 下载 frps 二进制文件
           for platform in linux-amd64 linux-arm64 windows-amd64 darwin-amd64 darwin-arm64; do
@@ -136,7 +138,7 @@ jobs:
             # frp release 文件名格式: frp_{version}_{platform}.{ext}
             # platform 格式: linux_amd64, windows_amd64, darwin_amd64 等
             platform_file="${platform/-/_}"
-            url="https://github.com/fatedier/frp/releases/download/v${VERSION}/frp_${VERSION}_${platform_file}.${ext}"
+            url="https://github.com/fatedier/frp/releases/download/v${FRP_VERSION}/frp_${FRP_VERSION}_${platform_file}.${ext}"
             echo "下载 $url"
 
             if [ "$ext" = "tar.gz" ]; then
