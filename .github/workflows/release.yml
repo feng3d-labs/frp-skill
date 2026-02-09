@@ -48,7 +48,6 @@ jobs:
         run: |
           VERSION="${{ steps.check.outputs.new-version }}"
           # 从 CHANGELOG.md 中提取当前版本的变更内容
-          # 查找从 ## [$VERSION] 到下一个 ## [ 之间的内容
           python3 << 'EOF'
           import re
           import sys
@@ -114,9 +113,88 @@ jobs:
         run: npx vitest --run test/e2e.test.ts
         timeout-minutes: 15
 
+  # 准备平台包的二进制文件
+  prepare-binaries:
+    needs: [check-version, test]
+    if: needs.check-version.outputs.should-publish == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download frp binaries
+        run: |
+          VERSION="${{ needs.check-version.outputs.new-version }}"
+
+          # 下载 frps 二进制文件
+          for platform in linux-amd64 linux-arm64 windows-amd64 darwin-amd64 darwin-arm64; do
+            IFS='-' read -r _ p_ext <<< "$platform"
+            [ "$p_ext" = "amd64" ] && platform_name="${platform/amd64/x64}" || platform_name="$platform"
+
+            case "$platform" in
+              linux-*) ext="tar.gz" ;;
+              windows-*) ext="zip" ;;
+              darwin-*) ext="tar.gz" ;;
+            esac
+
+            url="https://github.com/fatedier/frp/releases/download/v${VERSION}/frp_${VERSION}_${platform}.${ext}"
+            echo "下载 $url"
+
+            if [ "$ext" = "tar.gz" ]; then
+              curl -sL "$url" | tar xz
+            else
+              curl -sL "$url" -o frp.zip && unzip -q frp.zip
+            fi
+
+            # 移动二进制到对应平台包目录
+            frp_dir=$(find . -maxdepth 1 -type d -name "frp_*" | head -1)
+
+            case "$platform" in
+              linux-amd64)
+                mkdir -p packages/frps-linux-x64
+                cp "$frp_dir/frps" packages/frps-linux-x64/
+                mkdir -p packages/frpc-linux-x64
+                cp "$frp_dir/frpc" packages/frpc-linux-x64/
+                ;;
+              linux-arm64)
+                mkdir -p packages/frps-linux-arm64
+                cp "$frp_dir/frps" packages/frps-linux-arm64/
+                mkdir -p packages/frpc-linux-arm64
+                cp "$frp_dir/frpc" packages/frpc-linux-arm64/
+                ;;
+              windows-amd64)
+                mkdir -p packages/frps-win32-x64
+                cp "$frp_dir/frps.exe" packages/frps-win32-x64/
+                mkdir -p packages/frpc-win32-x64
+                cp "$frp_dir/frpc.exe" packages/frpc-win32-x64/
+                ;;
+              darwin-amd64)
+                mkdir -p packages/frps-darwin-x64
+                cp "$frp_dir/frps" packages/frps-darwin-x64/
+                mkdir -p packages/frpc-darwin-x64
+                cp "$frp_dir/frpc" packages/frpc-darwin-x64/
+                ;;
+              darwin-arm64)
+                mkdir -p packages/frps-darwin-arm64
+                cp "$frp_dir/frps" packages/frps-darwin-arm64/
+                mkdir -p packages/frpc-darwin-arm64
+                cp "$frp_dir/frpc" packages/frpc-darwin-arm64/
+                ;;
+            esac
+
+            rm -rf "$frp_dir" frp.zip
+          done
+
+      - name: Upload binaries artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-packages
+          path: packages/frps-*/** packages/frpc-**/
+
   # 构建并发布到 npm
   publish:
-    needs: [check-version, test]
+    needs: [check-version, test, prepare-binaries]
     if: needs.check-version.outputs.should-publish == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -126,6 +204,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: platform-packages
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -139,6 +222,7 @@ jobs:
       - name: Build packages
         run: npm run build
 
+      # 发布主包
       - name: Publish @feng3d/frps
         run: cd packages/frps && npm publish --provenance --access public
         env:
@@ -146,6 +230,20 @@ jobs:
 
       - name: Publish @feng3d/frpc
         run: cd packages/frpc && npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # 发布平台包
+      - name: Publish platform packages
+        run: |
+          for pkg in packages/frps-* packages/frpc-*; do
+            if [ -f "$pkg/package.json" ]; then
+              echo "发布 $pkg"
+              cd "$pkg"
+              npm publish --provenance --access public || echo "警告: $pkg 发布失败"
+              cd -
+            fi
+          done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -192,5 +290,13 @@ jobs:
             # 客户端
             npx @feng3d/frpc --server example.com --local-port 8080 --remote-port 8080
             ```
+
+            ### 平台包
+            平台包包含预编译的二进制文件，适用于国内网络环境：
+            - @feng3d/frps-linux-x64 / @feng3d/frpc-linux-x64
+            - @feng3d/frps-linux-arm64 / @feng3d/frpc-linux-arm64
+            - @feng3d/frps-win32-x64 / @feng3d/frpc-win32-x64
+            - @feng3d/frps-darwin-x64 / @feng3d/frpc-darwin-x64
+            - @feng3d/frps-darwin-arm64 / @feng3d/frpc-darwin-arm64
           draft: false
           prerelease: false

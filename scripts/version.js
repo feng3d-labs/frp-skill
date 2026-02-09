@@ -5,7 +5,7 @@
  * 用法: npm version [patch|minor|major|x.y.z]
  *
  * 此脚本作为 npm version 的钩子，在 npm version 升级版本后：
- * 1. 同步更新子包版本
+ * 1. 同步更新子包版本（frps, frpc, 以及所有平台包）
  * 2. 更新 CHANGELOG.md
  *
  * 完成后需要手动提交并推送，GitHub Actions 会在发布成功后创建 tag
@@ -25,6 +25,24 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.dirname(__dirname);
 
+// 所有需要同步版本的包
+const PACKAGES = [
+  'packages/frps',
+  'packages/frpc',
+  // frps 平台包
+  'packages/frps-linux-x64',
+  'packages/frps-linux-arm64',
+  'packages/frps-win32-x64',
+  'packages/frps-darwin-x64',
+  'packages/frps-darwin-arm64',
+  // frpc 平台包
+  'packages/frpc-linux-x64',
+  'packages/frpc-linux-arm64',
+  'packages/frpc-win32-x64',
+  'packages/frpc-darwin-x64',
+  'packages/frpc-darwin-arm64',
+];
+
 // 获取当前版本
 async function getCurrentVersion() {
   const pkgPath = path.join(rootDir, 'package.json');
@@ -34,12 +52,13 @@ async function getCurrentVersion() {
 
 // 更新 package.json 版本
 async function updateVersion(packagePath, newVersion) {
-  const content = await fs.readFile(packagePath, 'utf-8');
+  const fullPath = path.join(rootDir, packagePath, 'package.json');
+  const content = await fs.readFile(fullPath, 'utf-8');
   const pkg = JSON.parse(content);
   const oldVersion = pkg.version;
   pkg.version = newVersion;
-  await fs.writeFile(packagePath, JSON.stringify(pkg, null, 2) + '\n');
-  console.log(`  ${path.relative(rootDir, packagePath)}: ${oldVersion} -> ${newVersion}`);
+  await fs.writeFile(fullPath, JSON.stringify(pkg, null, 2) + '\n');
+  console.log(`  ${packagePath}: ${oldVersion} -> ${newVersion}`);
 }
 
 // 获取变更内容
@@ -100,11 +119,14 @@ async function main() {
   console.log(`\n同步版本: ${currentVersion} -> ${newVersion}\n`);
   console.log('更新文件:');
 
-  // 更新 packages/frps/package.json
-  await updateVersion(path.join(rootDir, 'packages', 'frps', 'package.json'), newVersion);
-
-  // 更新 packages/frpc/package.json
-  await updateVersion(path.join(rootDir, 'packages', 'frpc', 'package.json'), newVersion);
+  // 更新所有子包版本
+  for (const pkg of PACKAGES) {
+    try {
+      await updateVersion(pkg, newVersion);
+    } catch (err) {
+      console.error(`  警告: ${pkg} 更新失败 - ${err?.message || err}`);
+    }
+  }
 
   // 获取并更新 CHANGELOG
   const changes = await getChanges();
@@ -115,7 +137,7 @@ async function main() {
   console.log(`  git add -A`);
   console.log(`  git commit -m "chore: bump version to ${newVersion}"`);
   console.log(`  git push origin main`);
-  console.log('\n推送后 GitHub Actions 将自动发布并创建 tag');
+  console.log('\n推送后 GitHub Actions 将自动发布所有包并创建 tag');
 }
 
 main().catch(console.error);
