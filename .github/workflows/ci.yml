@@ -1,13 +1,14 @@
-name: Test
+name: CI
 
 on:
   push:
     branches: [main, feat/**]
   pull_request:
-    branches: [main, feat/**]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
+  # 单元测试 - 多平台多 Node 版本
   test:
     strategy:
       matrix:
@@ -33,7 +34,6 @@ jobs:
 
       - name: Cache npm dependencies
         uses: actions/cache@v4
-        id: npm-cache
         with:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
@@ -44,22 +44,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run unit tests
+      - name: Run tests
         run: npm test
 
-      - name: Generate coverage report
+      - name: Generate coverage
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x'
         run: npm run test:coverage
 
-      - name: Upload coverage to Codecov
+      - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x'
         uses: codecov/codecov-action@v4
+        continue-on-error: true
         with:
           files: ./coverage/coverage-final.json
-          flags: unittests
-          name: codecov-${{ matrix.os }}-node-${{ matrix.node-version }}
-        continue-on-error: true
 
+  # E2E 测试 - 下载对应平台二进制并测试
   e2e:
     strategy:
       matrix:
@@ -73,39 +72,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Get npm cache directory
-        id: npm-cache-dir
-        shell: bash
-        run: echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
-
-      - name: Cache npm dependencies
+      - name: Cache npm
         uses: actions/cache@v4
-        id: npm-cache
         with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-${{ matrix.node-version }}-
-            ${{ runner.os }}-node-
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
 
       - name: Cache frp binaries
         uses: actions/cache@v4
         with:
           path: binaries
-          key: ${{ runner.os }}-frp-0.67.0
+          key: frp-${{ runner.os }}-0.67.0
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run E2E tests
-        run: npm run test:e2e
+        run: npx vitest --run test/e2e.test.ts
         timeout-minutes: 15
 
+  # 构建验证
   build:
     strategy:
       matrix:
@@ -119,7 +110,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -133,10 +124,5 @@ jobs:
       - name: Verify build output
         shell: bash
         run: |
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            test -f "packages/frps/dist/cli.js" || exit 1
-            test -f "packages/frpc/dist/cli.js" || exit 1
-          else
-            test -f packages/frps/dist/cli.js || exit 1
-            test -f packages/frpc/dist/cli.js || exit 1
-          fi
+          test -f packages/frps/dist/cli.js || exit 1
+          test -f packages/frpc/dist/cli.js || exit 1
