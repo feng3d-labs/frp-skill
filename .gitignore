@@ -34,3 +34,6 @@ Thumbs.db
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+# E2E test binaries
+binaries/
