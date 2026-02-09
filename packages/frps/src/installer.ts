@@ -47,13 +47,11 @@ function getDefaultInstallDir(platformInfo: ReturnType<typeof getPlatformInfo>):
 }
 
 function getDefaultConfigDir(platformInfo: ReturnType<typeof getPlatformInfo>): string {
+  // 统一使用用户目录保存配置
   if (platformInfo.isWindows) {
-    return path.join(getDefaultInstallDir(platformInfo), 'config');
+    return path.join(process.env.USERPROFILE || '', 'frp');
   }
-  if (platformInfo.isMac) {
-    return path.join(process.env.HOME || '', 'frp');
-  }
-  return '/etc/frp';
+  return path.join(process.env.HOME || '', '.frp');
 }
 
 export async function install(options: InstallOptions): Promise<void> {

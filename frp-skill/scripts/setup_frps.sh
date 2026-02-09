@@ -15,9 +15,10 @@ sudo cp "/tmp/frp_${VERSION}_linux_amd64/frps" /usr/local/bin/
 rm -rf /tmp/frp.tar.gz "/tmp/frp_${VERSION}_linux_amd64"
 echo "  OK - frps 已安装到 /usr/local/bin/frps"
 
-echo "[2/5] 正在创建配置文件 /etc/frp/frps.toml ..."
-sudo mkdir -p /etc/frp
-sudo tee /etc/frp/frps.toml > /dev/null <<EOF
+CONFIG_DIR="$HOME/.frp"
+echo "[2/5] 正在创建配置文件 $CONFIG_DIR/frps.toml ..."
+mkdir -p "$CONFIG_DIR"
+tee "$CONFIG_DIR/frps.toml" > /dev/null <<EOF
 bindPort = ${BIND_PORT}
 EOF
 echo "  OK"
@@ -44,7 +45,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/frps -c /etc/frp/frps.toml
+ExecStart=/usr/local/bin/frps -c $HOME/.frp/frps.toml
 Restart=on-failure
 RestartSec=5s
 

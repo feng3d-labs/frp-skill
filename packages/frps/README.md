@@ -79,9 +79,8 @@ npx @feng3d/frps -p 7000 --no-service
 ## 配置文件
 
 默认配置文件位置：
-- Linux: `/etc/frp/frps.toml`
-- Windows: `C:\ProgramData\frp\frps.toml`
-- macOS: `/usr/local/etc/frp/frps.toml`
+- Linux/macOS: `~/.frp/frps.toml`
+- Windows: `%USERPROFILE%\frp\frps.toml`
 
 ## 许可证
 

@@ -103,9 +103,8 @@ npx @feng3d/frpc -s example.com -l 3000 -r 3000-3005
 ## 配置文件
 
 默认配置文件位置：
-- Linux: `/etc/frp/frpc.toml`
-- Windows: `C:\ProgramData\frp\frpc.toml`
-- macOS: `/usr/local/etc/frp/frpc.toml`
+- Linux/macOS: `~/.frp/frpc.toml`
+- Windows: `%USERPROFILE%\frp\frpc.toml`
 
 ## 许可证
 

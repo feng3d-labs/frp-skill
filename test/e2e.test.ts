@@ -6,8 +6,8 @@ import { createServer } from 'http';
 import { getRandomPort, waitForPort } from './helpers.js';
 
 describe('frp 端口转发 E2E 测试', () => {
-  let frpsProcess: ReturnType<typeof execaCommand>;
-  let frpcProcess: ReturnType<typeof execaCommand>;
+  let frpsProcess: ReturnType<typeof execa>;
+  let frpcProcess: ReturnType<typeof execa>;
   let testServer: ReturnType<typeof createServer>;
   let testServerPort: number;
   let frpsPort: number;
@@ -48,7 +48,7 @@ describe('frp 端口转发 E2E 测试', () => {
       throw new Error(
         `二进制文件未找到。请先运行 'npm install' 以下载二进制文件。\n` +
         `期望路径: ${binariesDir}\n` +
-        `错误: ${err.message}`
+        `错误: ${(err as Error).message}`
       );
     }
   }
@@ -80,12 +80,12 @@ describe('frp 端口转发 E2E 测试', () => {
 
     console.log(`测试 HTTP 服务器已启动，端口: ${testServerPort}`);
 
-    // 生成 frps 配置
+    // 生成 frps 配置（无 token）
     const frpsConfig = `bindPort = ${frpsPort}
 `;
     await fs.writeFile(frpsConfigPath, frpsConfig);
 
-    // 生成 frpc 配置
+    // 生成 frpc 配置（无 token）
     const frpcConfig = `serverAddr = "127.0.0.1"
 serverPort = ${frpsPort}
 
@@ -104,25 +104,19 @@ remotePort = ${remotePort}
   }, 30000);
 
   afterAll(async () => {
-    // 停止 frpc
-    if (frpcProcess) {
-      frpcProcess.kill();
+    // 清理进程
+    const killProcess = async (process: typeof frpsProcess | typeof frpcProcess | undefined) => {
+      if (!process) return;
       try {
-        await frpcProcess;
+        process.kill();
+        await process;
       } catch {
-        // Ignore
+        // 忽略进程已退出或 kill 失败的错误
       }
-    }
+    };
 
-    // 停止 frps
-    if (frpsProcess) {
-      frpsProcess.kill();
-      try {
-        await frpsProcess;
-      } catch {
-        // Ignore
-      }
-    }
+    await killProcess(frpcProcess);
+    await killProcess(frpsProcess);
 
     // 关闭测试服务器
     if (testServer) {
@@ -248,4 +242,255 @@ remotePort = ${remotePort}
     expect(response.status).toBe(200);
     console.log('✓ 自定义 HTTP 头转发成功');
   }, 10000);
+});
+
+describe('frp Token 认证 E2E 测试', () => {
+  let frpsProcess: ReturnType<typeof execa>;
+  let frpcProcess: ReturnType<typeof execa>;
+  let frpsPort: number;
+
+  const tempDir = path.join(process.env.TMP || '/tmp', 'frp-e2e-test-token');
+  const frpsConfigPath = path.join(tempDir, 'frps.toml');
+  const frpcConfigPath = path.join(tempDir, 'frpc.toml');
+
+  const testToken = 'test-secret-token-12345';
+
+  let frpsBinary: string;
+  let frpcBinary: string;
+
+  /**
+   * 获取二进制文件路径
+   */
+  async function getBinaryPaths(): Promise<{ frps: string; frpc: string }> {
+    const platform = process.platform;
+    const binaryExt = platform === 'win32' ? '.exe' : '';
+    const frpsName = `frps${binaryExt}`;
+    const frpcName = `frpc${binaryExt}`;
+
+    const { fileURLToPath } = await import('url');
+    const { dirname } = await import('path');
+    const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
+    const binariesDir = path.join(rootDir, 'binaries');
+
+    return {
+      frps: path.join(binariesDir, frpsName),
+      frpc: path.join(binariesDir, frpcName),
+    };
+  }
+
+  beforeAll(async () => {
+    await fs.mkdir(tempDir, { recursive: true });
+
+    const paths = await getBinaryPaths();
+    frpsBinary = paths.frps;
+    frpcBinary = paths.frpc;
+
+    frpsPort = await getRandomPort();
+
+    // 生成带 token 的 frps 配置
+    const frpsConfig = `bindPort = ${frpsPort}
+auth.token = "${testToken}"
+`;
+    await fs.writeFile(frpsConfigPath, frpsConfig);
+
+    console.log(`Token 认证测试配置: frps=${frpsPort}, token=${testToken}`);
+  }, 30000);
+
+  afterAll(async () => {
+    // 简单清理，不等待进程完全退出以避免 unhandled rejection
+    if (frpcProcess) {
+      frpcProcess.kill().catch(() => {});
+    }
+    if (frpsProcess) {
+      frpsProcess.kill().catch(() => {});
+    }
+
+    // 清理临时文件
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch {
+      // Ignore
+    }
+  }, 30000);
+
+  it('应该能够使用正确的 token 连接服务端', async () => {
+    // 生成带正确 token 的 frpc 配置
+    const frpcConfig = `serverAddr = "127.0.0.1"
+serverPort = ${frpsPort}
+auth.token = "${testToken}"
+
+[[proxies]]
+name = "test-with-token"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 80
+remotePort = 8080
+`;
+    await fs.writeFile(frpcConfigPath, frpcConfig);
+
+    // 启动 frps
+    frpsProcess = execa(frpsBinary, ['-c', frpsConfigPath], {
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+
+    const stdoutLogs: string[] = [];
+    const stderrLogs: string[] = [];
+
+    frpsProcess.stdout?.on('data', (data: Buffer) => {
+      const msg = data.toString();
+      stdoutLogs.push(msg);
+    });
+
+    frpsProcess.stderr?.on('data', (data: Buffer) => {
+      const msg = data.toString();
+      stderrLogs.push(msg);
+    });
+
+    await waitForPort(frpsPort, 10000);
+
+    // 启动 frpc
+    frpcProcess = execa(frpcBinary, ['-c', frpcConfigPath], {
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+
+    let clientConnected = false;
+
+    frpcProcess.stdout?.on('data', (data: Buffer) => {
+      const msg = data.toString();
+      if (msg.includes('login to server success') || msg.includes('start proxy success')) {
+        clientConnected = true;
+      }
+    });
+
+    // 等待连接
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    // 验证客户端成功连接
+    expect(clientConnected).toBe(true);
+    expect(frpcProcess.pid).toBeGreaterThan(0);
+    expect(frpcProcess.exitCode).toBeNull();
+
+    console.log('✓ 使用正确的 token 成功连接');
+  }, 20000);
+
+  it('应该拒绝使用错误 token 的客户端连接', async () => {
+    // 重启 frps 确保干净状态
+    if (frpsProcess) {
+      frpsProcess.kill();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    frpsProcess = execa(frpsBinary, ['-c', frpsConfigPath], {
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+
+    await waitForPort(frpsPort, 10000);
+
+    // 生成带错误 token 的 frpc 配置
+    const wrongTokenConfigPath = path.join(tempDir, 'frpc-wrong.toml');
+    const frpcConfig = `serverAddr = "127.0.0.1"
+serverPort = ${frpsPort}
+auth.token = "wrong-token-99999"
+
+[[proxies]]
+name = "test-wrong-token"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 80
+remotePort = 8081
+`;
+    await fs.writeFile(wrongTokenConfigPath, frpcConfig);
+
+    // 启动 frpc，预期会失败
+    let authError = false;
+    const outputChunks: string[] = [];
+
+    try {
+      const wrongClient = execa(frpcBinary, ['-c', wrongTokenConfigPath], {
+        stdio: ['inherit', 'pipe', 'pipe'],
+      });
+
+      wrongClient.stdout?.on('data', (data: Buffer) => {
+        const msg = data.toString();
+        outputChunks.push(msg);
+      });
+
+      // 等待进程结束（预期会失败）
+      await wrongClient;
+    } catch (err: unknown) {
+      // 预期的认证失败
+      const error = err as { stdout?: string | Buffer };
+      const output = String(error.stdout || '');
+      outputChunks.push(output);
+    }
+
+    const allOutput = outputChunks.join('');
+    // frp 会返回认证错误
+    authError = allOutput.includes('token') && (allOutput.includes('failed') || allOutput.includes("doesn't match"));
+
+    // 验证客户端未能连接
+    expect(authError).toBe(true);
+
+    console.log('✓ 错误 token 被正确拒绝');
+  }, 20000);
+
+  it('应该拒绝没有提供 token 的客户端连接', async () => {
+    // 重启 frps
+    if (frpsProcess) {
+      frpsProcess.kill();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    frpsProcess = execa(frpsBinary, ['-c', frpsConfigPath], {
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+
+    await waitForPort(frpsPort, 10000);
+
+    // 生成没有 token 的 frpc 配置
+    const noTokenConfigPath = path.join(tempDir, 'frpc-no-token.toml');
+    const frpcConfig = `serverAddr = "127.0.0.1"
+serverPort = ${frpsPort}
+
+[[proxies]]
+name = "test-no-token"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 80
+remotePort = 8082
+`;
+    await fs.writeFile(noTokenConfigPath, frpcConfig);
+
+    // 启动 frpc，预期会失败
+    let authError = false;
+    const outputChunks: string[] = [];
+
+    try {
+      const noTokenClient = execa(frpcBinary, ['-c', noTokenConfigPath], {
+        stdio: ['inherit', 'pipe', 'pipe'],
+      });
+
+      noTokenClient.stdout?.on('data', (data: Buffer) => {
+        const msg = data.toString();
+        outputChunks.push(msg);
+      });
+
+      // 等待进程结束（预期会失败）
+      await noTokenClient;
+    } catch (err: unknown) {
+      // 预期的认证失败
+      const error = err as { stdout?: string | Buffer };
+      const output = String(error.stdout || '');
+      outputChunks.push(output);
+    }
+
+    const allOutput = outputChunks.join('');
+    // frp 会返回认证错误
+    authError = allOutput.includes('token') && (allOutput.includes('failed') || allOutput.includes("doesn't match"));
+
+    // 验证客户端未能连接
+    expect(authError).toBe(true);
+
+    console.log('✓ 未提供 token 被正确拒绝');
+  }, 20000);
 });

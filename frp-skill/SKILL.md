@@ -81,7 +81,7 @@ Windows Defender 可能拦截 frpc.exe。如果遇到此问题：
 1. 以管理员身份运行 PowerShell
 2. 添加 Defender 排除：
    ```powershell
-   Add-MpPreference -ExclusionPath "C:\frp"
+   Add-MpPreference -ExclusionPath "$env:USERPROFILE\frp"
    ```
 
 ### 手动安装（备选）
@@ -90,7 +90,7 @@ Windows Defender 可能拦截 frpc.exe。如果遇到此问题：
 
 ```powershell
 # Windows
-powershell -ExecutionPolicy Bypass -File scripts/setup_frpc.ps1 -Version "0.67.0" -Dest "C:\frp"
+powershell -ExecutionPolicy Bypass -File scripts/setup_frpc.ps1 -Version "0.67.0" -Dest "$env:USERPROFILE\frp"
 ```
 
 使用 `assets/frpc.toml` 作为配置模板：
