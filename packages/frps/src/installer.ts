@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import chalk from 'chalk';
 import ora, { Ora } from 'ora';
 import { execaCommand } from 'execa';
-import { getBinaryPath, getPlatformInfo } from './downloader.js';
+import { getBinaryPath, getPlatformInfo } from './binary.js';
 import { setupSystemdService, startService } from './systemd.js';
 import { configureFirewall } from './firewall.js';
 import { setupWindowsService, startWindowsService, configureWindowsFirewall } from './windows-service.js';
