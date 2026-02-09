@@ -1,20 +1,28 @@
 {
-  "name": "frp_test",
+  "name": "@feng3d/frp-monorepo",
   "version": "1.0.0",
-  "description": "使用 [frp](https://github.com/fatedier/frp) 实现内网穿透的 Claude Code Skill，将本地服务暴露到公网访问。",
-  "main": "index.js",
+  "private": true,
+  "description": "frp 内网穿透 npm 包集合",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm run build --workspaces",
+    "dev": "npm run dev --workspaces",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/wardenfeng/frp-skill.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/wardenfeng/frp-skill/issues"
-  },
-  "homepage": "https://github.com/wardenfeng/frp-skill#readme"
+  "author": "feng3d",
+  "license": "MIT"
 }

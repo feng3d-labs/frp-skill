@@ -1,0 +1,43 @@
+{
+  "name": "@feng3d/frps",
+  "version": "1.0.0",
+  "description": "frp 服务端部署工具 - 一键部署 frps 到 Linux 服务器",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "frps": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsup src/cli.ts --format esm --clean",
+    "dev": "tsx src/cli.ts",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.0",
+    "execa": "^9.0.0",
+    "tar": "^6.2.0"
+  },
+  "devDependencies": {
+    "@types/tar": "^6.1.0",
+    "tsx": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "frp",
+    "frps",
+    "内网穿透",
+    "反向代理",
+    "nat",
+    "tunnel"
+  ],
+  "author": "feng3d",
+  "license": "MIT"
+}
