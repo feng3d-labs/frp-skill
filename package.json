@@ -1,6 +1,6 @@
 {
   "name": "@feng3d/frp-monorepo",
-  "version": "0.0.1",
+  "version": "0.67.0",
   "private": true,
   "description": "frp 内网穿透 npm 包集合",
   "workspaces": [
