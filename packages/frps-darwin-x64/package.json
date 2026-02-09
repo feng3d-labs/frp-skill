@@ -1,6 +1,6 @@
 {
   "name": "@feng3d/frps-darwin-x64",
-  "version": "0.67.1",
+  "version": "0.67.2",
   "description": "frps darwin x64 二进制文件",
   "type": "module",
   "main": "./frps",

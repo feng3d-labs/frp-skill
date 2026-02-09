@@ -1,6 +1,6 @@
 {
   "name": "@feng3d/frpc-linux-x64",
-  "version": "0.67.1",
+  "version": "0.67.2",
   "description": "frpc linux x64 二进制文件",
   "type": "module",
   "main": "./frpc",
