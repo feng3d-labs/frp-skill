@@ -143,7 +143,10 @@ jobs:
               darwin-*) ext="tar.gz" ;;
             esac
 
-            url="https://github.com/fatedier/frp/releases/download/v${VERSION}/frp_${VERSION}_${platform}.${ext}"
+            # frp release 文件名格式: frp_{version}_{platform}.{ext}
+            # platform 格式: linux_amd64, windows_amd64, darwin_amd64 等
+            platform_file="${platform/-/_}"
+            url="https://github.com/fatedier/frp/releases/download/v${VERSION}/frp_${VERSION}_${platform_file}.${ext}"
             echo "下载 $url"
 
             if [ "$ext" = "tar.gz" ]; then
