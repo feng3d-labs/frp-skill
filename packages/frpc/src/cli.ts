@@ -16,7 +16,6 @@ program
 program
   .option('-s, --server <addr>', '服务器地址')
   .option('-p, --server-port <port>', '服务器端口', '7000')
-  .option('--frp-version <version>', 'frp 版本', '0.67.0')
   .option('-d, --dir <dir>', '安装目录')
   .option('--local-ip <ip>', '本地 IP', '127.0.0.1')
   .option('--local-port <port>', '本地端口')
@@ -50,7 +49,6 @@ program
 program
   .command('install')
   .description('安装 frpc 客户端')
-  .option('--frp-version <version>', 'frp 版本', '0.67.0')
   .option('-d, --dir <dir>', '安装目录')
   .action(async (options) => {
     try {

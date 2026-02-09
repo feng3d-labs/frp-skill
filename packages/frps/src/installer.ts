@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import chalk from 'chalk';
 import ora, { Ora } from 'ora';
 import { execaCommand } from 'execa';
-import { downloadFrps, extractTar, extractZip, getPlatformInfo } from './downloader.js';
+import { getBinaryPath, getPlatformInfo } from './downloader.js';
 import { setupSystemdService, startService } from './systemd.js';
 import { configureFirewall } from './firewall.js';
 import { setupWindowsService, startWindowsService, configureWindowsFirewall } from './windows-service.js';
@@ -11,7 +11,6 @@ import { generateFrpsConfig } from './config.js';
 
 export interface InstallOptions {
   port: string;
-  frpVersion?: string;
   dir?: string;
   configDir?: string;
   noService?: boolean;
@@ -57,13 +56,11 @@ function getDefaultConfigDir(platformInfo: ReturnType<typeof getPlatformInfo>): 
 export async function install(options: InstallOptions): Promise<void> {
   const {
     port = '7000',
-    frpVersion = '0.67.0',
     dir: userDir,
     configDir: userConfigDir,
     noService = false
   } = options;
 
-  const version = frpVersion;
   const platformInfo = getPlatformInfo();
 
   const installDir = userDir || getDefaultInstallDir(platformInfo);
@@ -72,41 +69,10 @@ export async function install(options: InstallOptions): Promise<void> {
   let spinner: Ora;
 
   try {
-    // 1. 获取二进制文件（优先使用本地，否则下载）
+    // 1. 获取平台包中的二进制文件
     spinner = ora('正在准备 frps...').start();
-    const tempDir = platformInfo.isWindows ? path.join(process.env.TEMP || '', 'frp') : '/tmp';
-
-    const result = await downloadFrps({
-      version,
-      destDir: tempDir,
-      onProgress: (progress) => {
-        spinner.text = `正在下载 frps... ${Math.round(progress)}%`;
-      }
-    });
-
-    let sourceBinaryPath: string;
-    let needCleanup = false;
-
-    // 检查返回的是本地二进制还是压缩包路径
-    if (result.endsWith('.exe') || result.endsWith('frps') && !result.includes('.tar.gz') && !result.includes('.zip')) {
-      // 本地二进制文件
-      sourceBinaryPath = result;
-      spinner.succeed(chalk.green('使用本地二进制文件'));
-    } else {
-      // 需要解压的压缩包
-      spinner.text = '正在解压...';
-      let extractDir: string;
-      if (platformInfo.isWindows) {
-        extractDir = await extractZip(result, tempDir);
-      } else {
-        extractDir = await extractTar(result, tempDir);
-      }
-
-      const binaryName = platformInfo.isWindows ? 'frps.exe' : 'frps';
-      sourceBinaryPath = path.join(extractDir, binaryName);
-      needCleanup = true;
-      spinner.succeed(chalk.green('下载和解压完成'));
-    }
+    const binaryPath = await getBinaryPath(platformInfo.platform, platformInfo.arch);
+    spinner.succeed(chalk.green('使用平台包二进制文件'));
 
     // 2. 安装二进制
     spinner = ora('正在安装 frps...').start();
@@ -117,24 +83,10 @@ export async function install(options: InstallOptions): Promise<void> {
     const binaryName = platformInfo.isWindows ? 'frps.exe' : 'frps';
     const destBinaryPath = path.join(installDir, binaryName);
 
-    await fs.copyFile(sourceBinaryPath, destBinaryPath);
+    await fs.copyFile(binaryPath, destBinaryPath);
 
     if (!platformInfo.isWindows) {
       await fs.chmod(destBinaryPath, 0o755);
-    }
-
-    // 清理临时文件
-    if (needCleanup) {
-      try {
-        if (sourceBinaryPath.includes('.tar.gz') || sourceBinaryPath.includes('.zip')) {
-          await fs.unlink(sourceBinaryPath);
-        } else {
-          const extractDir = path.dirname(sourceBinaryPath);
-          await fs.rm(extractDir, { recursive: true, force: true });
-        }
-      } catch {
-        // 忽略清理错误
-      }
     }
 
     spinner.succeed(chalk.green('frps 已安装到 ' + destBinaryPath));

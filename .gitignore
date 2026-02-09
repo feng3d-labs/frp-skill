@@ -35,5 +35,14 @@ Thumbs.db
 # yarn.lock
 # pnpm-lock.yaml
 
-# E2E test binaries
+# Platform package binaries (downloaded during development)
+packages/frps-*/*.exe
+packages/frps-*/frps
+packages/frpc-*/*.exe
+packages/frpc-*/frpc
+
+# Temporary download directory
+temp_download/
+
+# Legacy binaries directory
 binaries/

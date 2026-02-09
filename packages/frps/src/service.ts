@@ -1,6 +1,6 @@
 import { execaCommand } from 'execa';
 import chalk from 'chalk';
-import { getPlatformInfo } from './downloader.js';
+import { getPlatformInfo } from './binary.js';
 
 const SERVICE_NAME = 'frps';
 

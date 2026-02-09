@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import chalk from 'chalk';
 import ora, { Ora } from 'ora';
-import { getPlatformInfo } from './downloader.js';
+import { getPlatformInfo } from './binary.js';
 
 export interface ConfigureOptions {
   server: string;

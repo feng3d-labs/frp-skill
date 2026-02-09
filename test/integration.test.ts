@@ -282,7 +282,7 @@ remotePort = 8000
 
   describe('平台检测功能验证', () => {
     it('应该正确检测当前平台', async () => {
-      const { getPlatformInfo } = await import('../packages/frps/src/downloader.js');
+      const { getPlatformInfo } = await import('../packages/frps/src/binary.js');
 
       const platformInfo = getPlatformInfo();
 
@@ -302,27 +302,21 @@ remotePort = 8000
       expect(platformCount).toBe(1);
     });
 
-    it('应该为当前平台构建正确的下载 URL', async () => {
-      const { buildDownloadUrl, getPlatformInfo } = await import('../packages/frps/src/downloader.js');
+    it('应该为当前平台返回正确的平台包名', async () => {
+      const { getPlatformPackageName, getPlatformInfo } = await import('../packages/frps/src/binary.js');
 
       const platformInfo = getPlatformInfo();
-      const url = buildDownloadUrl('0.67.0', platformInfo.platform, platformInfo.arch);
+      const packageName = getPlatformPackageName(platformInfo.platform, platformInfo.arch);
 
-      expect(url).toContain('https://github.com/fatedier/frp/releases/download/v0.67.0/');
-      expect(url).toContain('frp_0.67.0_');
-
-      // 验证文件扩展名
-      if (platformInfo.isWindows) {
-        expect(url).toEqual(expect.stringMatching(/\.zip$/));
-      } else {
-        expect(url).toEqual(expect.stringMatching(/\.tar\.gz$/));
-      }
+      expect(packageName).toMatch(/^@feng3d\/frps-/);
+      expect(packageName).toContain(platformInfo.platform === 'win32' ? 'win32' : platformInfo.platform);
+      expect(packageName).toContain(platformInfo.arch === 'arm64' ? 'arm64' : 'x64');
     });
   });
 
   describe('Windows 平台特定测试', () => {
     it('Windows 平台应使用正确的二进制文件名', async () => {
-      const { getPlatformPackageName } = await import('../packages/frps/src/downloader.js');
+      const { getPlatformPackageName } = await import('../packages/frps/src/binary.js');
 
       const packageName = getPlatformPackageName('win32', 'x64');
       expect(packageName).toBe('@feng3d/frps-win32-x64');
@@ -330,18 +324,11 @@ remotePort = 8000
       const armPackageName = getPlatformPackageName('win32', 'arm64');
       expect(armPackageName).toBe('@feng3d/frps-win32-arm64');
     });
-
-    it('Windows 应该使用 zip 压缩格式', async () => {
-      const { buildDownloadUrl } = await import('../packages/frps/src/downloader.js');
-
-      const url = buildDownloadUrl('0.67.0', 'win32', 'x64');
-      expect(url).toContain('windows_amd64.zip');
-    });
   });
 
   describe('Linux 平台特定测试', () => {
     it('Linux 平台应使用正确的二进制文件名', async () => {
-      const { getPlatformPackageName } = await import('../packages/frps/src/downloader.js');
+      const { getPlatformPackageName } = await import('../packages/frps/src/binary.js');
 
       const packageName = getPlatformPackageName('linux', 'x64');
       expect(packageName).toBe('@feng3d/frps-linux-x64');
@@ -349,31 +336,17 @@ remotePort = 8000
       const armPackageName = getPlatformPackageName('linux', 'arm64');
       expect(armPackageName).toBe('@feng3d/frps-linux-arm64');
     });
-
-    it('Linux 应该使用 tar.gz 压缩格式', async () => {
-      const { buildDownloadUrl } = await import('../packages/frps/src/downloader.js');
-
-      const url = buildDownloadUrl('0.67.0', 'linux', 'x64');
-      expect(url).toContain('linux_amd64.tar.gz');
-    });
   });
 
   describe('macOS 平台特定测试', () => {
     it('macOS 平台应使用正确的二进制文件名', async () => {
-      const { getPlatformPackageName } = await import('../packages/frps/src/downloader.js');
+      const { getPlatformPackageName } = await import('../packages/frps/src/binary.js');
 
       const packageName = getPlatformPackageName('darwin', 'x64');
       expect(packageName).toBe('@feng3d/frps-darwin-x64');
 
       const armPackageName = getPlatformPackageName('darwin', 'arm64');
       expect(armPackageName).toBe('@feng3d/frps-darwin-arm64');
-    });
-
-    it('macOS 应该使用 tar.gz 压缩格式', async () => {
-      const { buildDownloadUrl } = await import('../packages/frps/src/downloader.js');
-
-      const url = buildDownloadUrl('0.67.0', 'darwin', 'arm64');
-      expect(url).toContain('darwin_arm64.tar.gz');
     });
   });
 });

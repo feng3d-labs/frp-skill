@@ -2,7 +2,7 @@ import { execaCommand } from 'execa';
 import chalk from 'chalk';
 import path from 'path';
 import fs from 'fs/promises';
-import { getPlatformInfo } from './downloader.js';
+import { getPlatformInfo } from './binary.js';
 
 export interface RunOptions {
   config?: string;

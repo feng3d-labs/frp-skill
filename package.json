@@ -8,8 +8,8 @@
   ],
   "scripts": {
     "postinstall": "node scripts/download-binaries.js",
-    "build": "npm run build --workspaces",
-    "dev": "npm run dev --workspaces",
+    "build": "npm run build --workspace=@feng3d/frps --workspace=@feng3d/frpc",
+    "dev": "npm run dev --workspace=@feng3d/frps --workspace=@feng3d/frpc",
     "prepublishOnly": "npm run build",
     "test": "vitest --run",
     "test:watch": "vitest",

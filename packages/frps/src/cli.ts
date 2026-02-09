@@ -14,7 +14,6 @@ program
 // 默认命令：npx @feng3d/frps -p 7000
 program
   .option('-p, --port <port>', '绑定端口', '7000')
-  .option('--frp-version <version>', 'frp 版本', '0.67.0')
   .option('-d, --dir <dir>', '安装目录')
   .option('--config-dir <dir>', '配置目录')
   .option('--no-service', '不创建系统服务')
@@ -32,7 +31,6 @@ program
   .command('install')
   .description('安装 frps 服务端')
   .option('-p, --port <port>', '绑定端口', '7000')
-  .option('--frp-version <version>', 'frp 版本', '0.67.0')
   .option('-d, --dir <dir>', '安装目录')
   .option('--config-dir <dir>', '配置目录')
   .option('--no-service', '不创建系统服务')

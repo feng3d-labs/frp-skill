@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * 下载 frp 二进制文件用于 E2E 测试
+ * 下载 frp 二进制文件用于开发和测试
  * 在 npm install 时自动运行
+ *
+ * 此脚本将二进制文件下载到平台包目录中，与生产环境使用方式一致
  */
 
 import fs from 'fs/promises';
@@ -12,7 +14,6 @@ import { pipeline } from 'stream/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const binariesDir = path.join(rootDir, 'binaries');
 
 const FRP_VERSION = '0.67.0';
 
@@ -25,8 +26,9 @@ function getPlatformInfo() {
   const platformName = platform === 'win32' ? 'windows' : platform;
   const ext = platform === 'win32' ? 'zip' : 'tar.gz';
   const binaryExt = platform === 'win32' ? '.exe' : '';
+  const npmArch = process.arch === 'arm64' ? 'arm64' : 'x64';
 
-  return { platform, arch, platformName, ext, binaryExt };
+  return { platform, arch, platformName, ext, binaryExt, npmArch };
 }
 
 /**
@@ -73,18 +75,20 @@ async function extractZip(zipPath, destDir) {
  * 主函数
  */
 async function main() {
-  const { platformName, arch, ext, binaryExt } = getPlatformInfo();
+  const { platform, npmArch, platformName, arch, ext, binaryExt } = getPlatformInfo();
 
   console.log(`\n准备下载 frp ${FRP_VERSION} 二进制文件...`);
   console.log(`平台: ${platformName} ${arch}\n`);
 
-  // 确保目录存在
-  await fs.mkdir(binariesDir, { recursive: true });
+  // 平台包目录
+  const frpsPlatformDir = path.join(rootDir, 'packages', `frps-${platform}-${npmArch}`);
+  const frpcPlatformDir = path.join(rootDir, 'packages', `frpc-${platform}-${npmArch}`);
+
+  // 目标二进制文件路径
+  const frpsBinary = path.join(frpsPlatformDir, `frps${binaryExt}`);
+  const frpcBinary = path.join(frpcPlatformDir, `frpc${binaryExt}`);
 
   // 检查是否已存在
-  const frpsBinary = path.join(binariesDir, `frps${binaryExt}`);
-  const frpcBinary = path.join(binariesDir, `frpc${binaryExt}`);
-
   try {
     await fs.access(frpsBinary);
     await fs.access(frpcBinary);
@@ -94,17 +98,23 @@ async function main() {
     // 继续下载
   }
 
+  // 确保平台包目录存在
+  await fs.mkdir(frpsPlatformDir, { recursive: true });
+  await fs.mkdir(frpcPlatformDir, { recursive: true });
+
   // 下载 URL
   const baseUrl = `https://github.com/fatedier/frp/releases/download/v${FRP_VERSION}`;
   const tarballUrl = `${baseUrl}/frp_${FRP_VERSION}_${platformName}_${arch}.${ext}`;
 
-  // 下载压缩包
-  const tarballPath = path.join(binariesDir, `frp.${ext}`);
+  // 下载到临时目录
+  const tempDir = path.join(rootDir, 'temp_download');
+  await fs.mkdir(tempDir, { recursive: true });
+  const tarballPath = path.join(tempDir, `frp.${ext}`);
   await downloadFile(tarballUrl, tarballPath);
 
   // 解压
   console.log('解压中...');
-  const extractDir = path.join(binariesDir, 'extracted');
+  const extractDir = path.join(tempDir, 'extracted');
 
   if (ext === 'zip') {
     await extractZip(tarballPath, extractDir);
@@ -124,7 +134,7 @@ async function main() {
 
   const binaryDir = path.join(extractDir, frpDir);
 
-  // 复制二进制文件
+  // 复制二进制文件到平台包目录
   await fs.copyFile(
     path.join(binaryDir, `frps${binaryExt}`),
     frpsBinary
@@ -141,10 +151,9 @@ async function main() {
   }
 
   // 清理
-  await fs.rm(tarballPath, { force: true });
-  await fs.rm(extractDir, { recursive: true, force: true });
+  await fs.rm(tempDir, { recursive: true, force: true });
 
-  console.log('\n✓ 二进制文件已下载到:');
+  console.log('\n✓ 二进制文件已下载到平台包目录:');
   console.log(`  - ${frpsBinary}`);
   console.log(`  - ${frpcBinary}\n`);
 }
