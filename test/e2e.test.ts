@@ -5,6 +5,40 @@ import { execa } from 'execa';
 import { createServer } from 'http';
 import { getRandomPort, waitForPort } from './helpers.js';
 
+/**
+ * 优雅地终止进程，避免 unhandled rejection
+ */
+async function gracefulKill(process: ReturnType<typeof execa> | undefined, signal: NodeJS.Signals = 'SIGTERM'): Promise<void> {
+  if (!process) return Promise.resolve();
+
+  // 先抑制 promise rejection 错误传播
+  void process.catch(() => {});
+
+  try {
+    // 先尝试正常终止
+    process.kill(signal);
+
+    // 等待进程退出，最多等待 2 秒
+    const timeout = 2000;
+    const startTime = Date.now();
+
+    while (process.exitCode === null && Date.now() - startTime < timeout) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // 如果还没退出，强制终止
+    if (process.exitCode === null) {
+      process.kill('SIGKILL');
+      // 给进程一点时间清理
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  } catch {
+    // 进程可能已经退出
+  }
+
+  return Promise.resolve();
+}
+
 describe('frp 端口转发 E2E 测试', () => {
   let frpsProcess: ReturnType<typeof execa>;
   let frpcProcess: ReturnType<typeof execa>;
@@ -104,19 +138,11 @@ remotePort = ${remotePort}
   }, 30000);
 
   afterAll(async () => {
-    // 清理进程
-    const killProcess = async (process: typeof frpsProcess | typeof frpcProcess | undefined) => {
-      if (!process) return;
-      try {
-        process.kill();
-        await process;
-      } catch {
-        // 忽略进程已退出或 kill 失败的错误
-      }
-    };
-
-    await killProcess(frpcProcess);
-    await killProcess(frpsProcess);
+    // 优雅地清理所有进程
+    await Promise.all([
+      gracefulKill(frpcProcess),
+      gracefulKill(frpsProcess),
+    ]);
 
     // 关闭测试服务器
     if (testServer) {
@@ -297,13 +323,11 @@ auth.token = "${testToken}"
   }, 30000);
 
   afterAll(async () => {
-    // 简单清理，不等待进程完全退出以避免 unhandled rejection
-    if (frpcProcess) {
-      frpcProcess.kill().catch(() => {});
-    }
-    if (frpsProcess) {
-      frpsProcess.kill().catch(() => {});
-    }
+    // 优雅地清理所有进程
+    await Promise.all([
+      gracefulKill(frpcProcess),
+      gracefulKill(frpsProcess),
+    ]);
 
     // 清理临时文件
     try {
@@ -375,10 +399,8 @@ remotePort = 8080
 
   it('应该拒绝使用错误 token 的客户端连接', async () => {
     // 重启 frps 确保干净状态
-    if (frpsProcess) {
-      frpsProcess.kill();
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
+    await gracefulKill(frpsProcess);
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     frpsProcess = execa(frpsBinary, ['-c', frpsConfigPath], {
       stdio: ['inherit', 'pipe', 'pipe'],
@@ -436,10 +458,8 @@ remotePort = 8081
 
   it('应该拒绝没有提供 token 的客户端连接', async () => {
     // 重启 frps
-    if (frpsProcess) {
-      frpsProcess.kill();
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
+    await gracefulKill(frpsProcess);
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     frpsProcess = execa(frpsBinary, ['-c', frpsConfigPath], {
       stdio: ['inherit', 'pipe', 'pipe'],
