@@ -3,6 +3,11 @@ import path from 'path';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import tar from 'tar';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const packageDir = path.resolve(__dirname, '..');
+const workspaceRoot = path.resolve(packageDir, '..');
 
 export interface PlatformInfo {
   platform: NodeJS.Platform;
@@ -18,6 +23,7 @@ export interface DownloadOptions {
   arch?: string;
   destDir: string;
   onProgress?: (progress: number) => void;
+  useLocalBinary?: boolean;
 }
 
 export function getPlatformInfo(): PlatformInfo {
@@ -31,6 +37,38 @@ export function getPlatformInfo(): PlatformInfo {
     isLinux: platform === 'linux',
     isMac: platform === 'darwin'
   };
+}
+
+export function getPlatformPackageName(platform: NodeJS.Platform, arch: string): string {
+  const platformName = platform;
+  const archName = arch === 'arm64' ? 'arm64' : 'x64';
+  return `@feng3d/frps-${platformName}-${archName}`;
+}
+
+/**
+ * 检查平台包中是否已存在二进制文件
+ * 优先查找已安装的平台包（通过 optionalDependencies）
+ */
+export async function getLocalBinary(platform: NodeJS.Platform, arch: string): Promise<string | null> {
+  const binaryName = platform === 'win32' ? 'frps.exe' : 'frps';
+  const platformPackageName = getPlatformPackageName(platform, arch);
+
+  // 尝试从 node_modules 中查找平台包
+  const platformPkgPath = path.join(workspaceRoot, 'node_modules', platformPackageName, binaryName);
+
+  try {
+    await fs.access(platformPkgPath);
+    return platformPkgPath;
+  } catch {
+    // 如果 node_modules 中没有，尝试从本地 packages 目录查找（开发环境）
+    const localPlatformPkg = path.join(workspaceRoot, 'packages', platformPackageName.replace('@feng3d/frps-', 'frps-'), binaryName);
+    try {
+      await fs.access(localPlatformPkg);
+      return localPlatformPkg;
+    } catch {
+      return null;
+    }
+  }
 }
 
 export function buildDownloadUrl(
@@ -84,19 +122,31 @@ export async function downloadWithProgress(
 }
 
 export async function downloadFrps(options: DownloadOptions): Promise<string> {
-  const { version, platform = process.platform, arch = process.arch, destDir, onProgress } = options;
+  const {
+    version,
+    platform = process.platform,
+    arch = process.arch,
+    destDir,
+    onProgress,
+    useLocalBinary = true
+  } = options;
 
   // 确保 destDir 存在
   await fs.mkdir(destDir, { recursive: true });
 
-  // 构建下载 URL
-  const url = buildDownloadUrl(version, platform, arch);
+  // 首先尝试使用本地二进制文件
+  if (useLocalBinary) {
+    const localBinary = await getLocalBinary(platform, arch);
+    if (localBinary) {
+      return localBinary;
+    }
+  }
 
-  // 确定文件扩展名
+  // 下载二进制文件
+  const url = buildDownloadUrl(version, platform, arch);
   const ext = platform === 'win32' ? 'zip' : 'tar.gz';
   const tarballPath = path.join(destDir, `frp.${ext}`);
 
-  // 下载文件
   await downloadWithProgress(url, tarballPath, onProgress);
 
   return tarballPath;

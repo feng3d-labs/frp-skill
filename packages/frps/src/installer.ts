@@ -74,59 +74,81 @@ export async function install(options: InstallOptions): Promise<void> {
   let spinner: Ora;
 
   try {
-    // 1. 下载二进制
-    spinner = ora('正在下载 frps...').start();
+    // 1. 获取二进制文件（优先使用本地，否则下载）
+    spinner = ora('正在准备 frps...').start();
     const tempDir = platformInfo.isWindows ? path.join(process.env.TEMP || '', 'frp') : '/tmp';
 
-    const tarballPath = await downloadFrps({
+    const result = await downloadFrps({
       version,
       destDir: tempDir,
       onProgress: (progress) => {
         spinner.text = `正在下载 frps... ${Math.round(progress)}%`;
       }
     });
-    spinner.succeed(chalk.green('下载完成'));
 
-    // 2. 解压
-    spinner = ora('正在解压...').start();
-    let extractDir: string;
-    if (platformInfo.isWindows) {
-      extractDir = await extractZip(tarballPath, tempDir);
+    let sourceBinaryPath: string;
+    let needCleanup = false;
+
+    // 检查返回的是本地二进制还是压缩包路径
+    if (result.endsWith('.exe') || result.endsWith('frps') && !result.includes('.tar.gz') && !result.includes('.zip')) {
+      // 本地二进制文件
+      sourceBinaryPath = result;
+      spinner.succeed(chalk.green('使用本地二进制文件'));
     } else {
-      extractDir = await extractTar(tarballPath, tempDir);
-    }
-    spinner.succeed(chalk.green('解压完成'));
+      // 需要解压的压缩包
+      spinner.text = '正在解压...';
+      let extractDir: string;
+      if (platformInfo.isWindows) {
+        extractDir = await extractZip(result, tempDir);
+      } else {
+        extractDir = await extractTar(result, tempDir);
+      }
 
-    // 3. 安装二进制
+      const binaryName = platformInfo.isWindows ? 'frps.exe' : 'frps';
+      sourceBinaryPath = path.join(extractDir, binaryName);
+      needCleanup = true;
+      spinner.succeed(chalk.green('下载和解压完成'));
+    }
+
+    // 2. 安装二进制
     spinner = ora('正在安装 frps...').start();
 
     // 确保安装目录存在
     await fs.mkdir(installDir, { recursive: true });
 
     const binaryName = platformInfo.isWindows ? 'frps.exe' : 'frps';
-    const binaryPath = path.join(extractDir, binaryName);
     const destBinaryPath = path.join(installDir, binaryName);
 
-    await fs.copyFile(binaryPath, destBinaryPath);
+    await fs.copyFile(sourceBinaryPath, destBinaryPath);
 
     if (!platformInfo.isWindows) {
       await fs.chmod(destBinaryPath, 0o755);
     }
 
     // 清理临时文件
-    await fs.unlink(tarballPath);
-    await fs.rm(extractDir, { recursive: true, force: true });
+    if (needCleanup) {
+      try {
+        if (sourceBinaryPath.includes('.tar.gz') || sourceBinaryPath.includes('.zip')) {
+          await fs.unlink(sourceBinaryPath);
+        } else {
+          const extractDir = path.dirname(sourceBinaryPath);
+          await fs.rm(extractDir, { recursive: true, force: true });
+        }
+      } catch {
+        // 忽略清理错误
+      }
+    }
 
     spinner.succeed(chalk.green('frps 已安装到 ' + destBinaryPath));
 
-    // 4. 创建配置
+    // 3. 创建配置
     spinner = ora('正在创建配置文件...').start();
     await fs.mkdir(configDir, { recursive: true });
     const configPath = path.join(configDir, 'frps.toml');
     await generateFrpsConfig(configPath, { bindPort: port });
     spinner.succeed(chalk.green('配置文件已创建: ' + configPath));
 
-    // 5. 配置防火墙
+    // 4. 配置防火墙
     spinner = ora('正在配置防火墙...').start();
     if (platformInfo.isWindows) {
       await configureWindowsFirewall([port]);
@@ -138,7 +160,7 @@ export async function install(options: InstallOptions): Promise<void> {
       spinner.info(chalk.yellow('请手动配置防火墙开放端口 ' + port));
     }
 
-    // 6. 创建系统服务
+    // 5. 创建系统服务
     if (!noService) {
       if (platformInfo.isLinux) {
         const isRoot = await checkRoot();
@@ -155,7 +177,7 @@ export async function install(options: InstallOptions): Promise<void> {
           });
           spinner.succeed(chalk.green('systemd 服务已创建'));
 
-          // 7. 启动服务
+          // 6. 启动服务
           spinner = ora('正在启动 frps 服务...').start();
           await startService('frps');
 
@@ -198,7 +220,7 @@ export async function install(options: InstallOptions): Promise<void> {
       }
     }
 
-    // 8. 显示完成信息
+    // 6. 显示完成信息
     console.log('\n' + chalk.bold.green('=== 部署完成 ==='));
     console.log(chalk.blue('  通信端口  : ') + port);
     console.log(chalk.blue('  配置文件  : ') + configPath);

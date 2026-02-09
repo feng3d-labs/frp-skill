@@ -1,0 +1,17 @@
+{
+  "name": "@feng3d/frpc-linux-arm64",
+  "version": "1.0.0",
+  "description": "frp client for Linux ARM64",
+  "type": "module",
+  "files": [
+    "frpc"
+  ],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "author": "feng3d",
+  "license": "MIT"
+}

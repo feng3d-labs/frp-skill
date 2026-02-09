@@ -12,22 +12,31 @@
     "templates"
   ],
   "scripts": {
-    "build": "tsup src/cli.ts --format esm --clean",
+    "build": "tsup src/cli.ts --format esm --clean --external unzipper --external @aws-sdk/client-s3 --external tar",
     "dev": "tsx src/cli.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "download:binaries": "node scripts/download-binaries.js",
+    "build:packages": "npm run download:binaries && npm run publish:packages",
+    "publish:packages": "npm run publish:packages --ws",
+    "publish:platform": "node scripts/publish-platform.js"
   },
   "dependencies": {
     "commander": "^12.0.0",
     "chalk": "^5.3.0",
     "ora": "^8.0.0",
     "execa": "^9.0.0",
-    "tar": "^6.2.0",
-    "unzipper": "^0.12.0"
+    "unzipper": "^0.12.0",
+    "tar": "^6.2.0"
   },
   "devDependencies": {
-    "@types/tar": "^6.1.0",
-    "@types/unzipper": "^0.10.0",
     "tsx": "^4.0.0"
+  },
+  "optionalDependencies": {
+    "@feng3d/frps-linux-x64": "1.0.0",
+    "@feng3d/frps-linux-arm64": "1.0.0",
+    "@feng3d/frps-win32-x64": "1.0.0",
+    "@feng3d/frps-darwin-x64": "1.0.0",
+    "@feng3d/frps-darwin-arm64": "1.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

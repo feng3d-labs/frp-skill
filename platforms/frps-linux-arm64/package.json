@@ -1,0 +1,17 @@
+{
+  "name": "@feng3d/frps-linux-arm64",
+  "version": "1.0.0",
+  "description": "frp server for Linux ARM64",
+  "type": "module",
+  "files": [
+    "frps"
+  ],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "author": "feng3d",
+  "license": "MIT"
+}

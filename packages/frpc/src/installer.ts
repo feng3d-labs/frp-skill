@@ -43,33 +43,50 @@ export async function install(options: InstallOptions): Promise<void> {
       }
     }
 
-    // 1. 下载二进制
-    spinner = ora('正在下载 frpc...').start();
-    const tarballPath = await downloadFrpc({
+    // 1. 获取二进制文件（优先使用本地，否则下载）
+    spinner = ora('正在准备 frpc...').start();
+    const result = await downloadFrpc({
       version,
       destDir: installDir,
       onProgress: (progress) => {
         spinner.text = `正在下载 frpc... ${Math.round(progress)}%`;
       }
     });
-    spinner.succeed(chalk.green('下载完成'));
 
-    // 2. 解压
-    spinner = ora('正在解压...').start();
-    let extractDir: string;
-    if (platformInfo.isWindows) {
-      extractDir = await extractZip(tarballPath, installDir);
+    let sourceBinaryPath: string;
+    let needCleanup = false;
+
+    // 检查返回的是本地二进制还是压缩包路径
+    if (result.endsWith('.exe') || result.endsWith('frpc') && !result.includes('.tar.gz') && !result.includes('.zip')) {
+      // 本地二进制文件
+      sourceBinaryPath = result;
+      spinner.succeed(chalk.green('使用本地二进制文件'));
     } else {
-      extractDir = await extractTar(tarballPath, installDir);
+      // 需要解压的压缩包
+      spinner.text = '正在解压...';
+      let extractDir: string;
+      if (platformInfo.isWindows) {
+        extractDir = await extractZip(result, installDir);
+      } else {
+        extractDir = await extractTar(result, installDir);
+      }
+
+      const binaryName = platformInfo.isWindows ? 'frpc.exe' : 'frpc';
+      sourceBinaryPath = path.join(extractDir, binaryName);
+      needCleanup = true;
+      spinner.succeed(chalk.green('下载和解压完成'));
     }
-    spinner.succeed(chalk.green('解压完成'));
 
-    // 3. 复制 frpc 可执行文件到安装目录
+    // 2. 安装二进制
     spinner = ora('正在安装 frpc...').start();
-    const binaryPath = path.join(extractDir, platformInfo.isWindows ? 'frpc.exe' : 'frpc');
-    const destBinaryPath = path.join(installDir, platformInfo.isWindows ? 'frpc.exe' : 'frpc');
 
-    await fs.copyFile(binaryPath, destBinaryPath);
+    // 确保安装目录存在
+    await fs.mkdir(installDir, { recursive: true });
+
+    const binaryName = platformInfo.isWindows ? 'frpc.exe' : 'frpc';
+    const destBinaryPath = path.join(installDir, binaryName);
+
+    await fs.copyFile(sourceBinaryPath, destBinaryPath);
 
     // 非Windows系统添加执行权限
     if (!platformInfo.isWindows) {
@@ -77,12 +94,22 @@ export async function install(options: InstallOptions): Promise<void> {
     }
 
     // 清理临时文件
-    await fs.unlink(tarballPath);
-    await fs.rm(extractDir, { recursive: true, force: true });
+    if (needCleanup) {
+      try {
+        if (sourceBinaryPath.includes('.tar.gz') || sourceBinaryPath.includes('.zip')) {
+          await fs.unlink(sourceBinaryPath);
+        } else {
+          const extractDir = path.dirname(sourceBinaryPath);
+          await fs.rm(extractDir, { recursive: true, force: true });
+        }
+      } catch {
+        // 忽略清理错误
+      }
+    }
 
     spinner.succeed(chalk.green('frpc 已安装到 ' + destBinaryPath));
 
-    // 4. 显示完成信息
+    // 3. 显示完成信息
     console.log('\n' + chalk.bold.green('=== 安装完成 ==='));
     console.log(chalk.blue('  安装目录  : ') + installDir);
     console.log(chalk.blue('  可执行文件: ') + destBinaryPath);
