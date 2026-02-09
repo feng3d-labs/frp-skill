@@ -10,8 +10,10 @@
     "build": "npm run build --workspaces",
     "dev": "npm run dev --workspaces",
     "prepublishOnly": "npm run build",
-    "test": "npm run test --workspaces",
-    "test:coverage": "npm run test:coverage --workspaces",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest --coverage",
+    "test:unit": "npm run test --workspaces",
     "lint": "eslint packages/*/src",
     "format": "prettier --write \"packages/*/src/**/*.ts\""
   },
