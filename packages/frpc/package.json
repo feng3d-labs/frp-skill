@@ -15,6 +15,8 @@
     "build": "tsup src/cli.ts --format esm --clean --external unzipper --external @aws-sdk/client-s3 --external tar",
     "dev": "tsx src/cli.ts",
     "prepublishOnly": "npm run build",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
     "download:binaries": "node scripts/download-binaries.js"
   },
   "dependencies": {

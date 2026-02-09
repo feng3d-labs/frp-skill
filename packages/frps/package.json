@@ -15,10 +15,9 @@
     "build": "tsup src/cli.ts --format esm --clean --external unzipper --external @aws-sdk/client-s3 --external tar",
     "dev": "tsx src/cli.ts",
     "prepublishOnly": "npm run build",
-    "download:binaries": "node scripts/download-binaries.js",
-    "build:packages": "npm run download:binaries && npm run publish:packages",
-    "publish:packages": "npm run publish:packages --ws",
-    "publish:platform": "node scripts/publish-platform.js"
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "download:binaries": "node scripts/download-binaries.js"
   },
   "dependencies": {
     "commander": "^12.0.0",
