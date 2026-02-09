@@ -2,14 +2,16 @@
 
 /**
  * 版本管理脚本
- * 用法: node scripts/version.js [patch|minor|major|version] [--message "变更内容"]
+ * 用法: node scripts/version.js [newversion]
+ *
+ * 此脚本作为 npm version 的钩子，在 npm version 升级版本后同步更新子包版本
+ * 同时也支持独立的版本升级命令
  *
  * 示例:
- *   node scripts/version.js patch                                   # 0.0.1 -> 0.0.2
- *   node scripts/version.js patch --message "修复 bug"              # 带变更内容
- *   node scripts/version.js minor                                   # 0.0.1 -> 0.1.0
- *   node scripts/version.js major                                   # 0.0.1 -> 1.0.0
- *   node scripts/version.js 1.2.3                                   # 设置为 1.2.3
+ *   npm version patch       # 0.0.1 -> 0.0.2
+ *   npm version minor       # 0.0.1 -> 0.1.0
+ *   npm version major       # 0.0.1 -> 1.0.0
+ *   npm version 1.2.3       # 设置为 1.2.3
  */
 
 import fs from 'fs/promises';
@@ -27,41 +29,6 @@ async function getCurrentVersion() {
   return pkg.version;
 }
 
-// 解析新版本
-function getNewVersion(current, input) {
-  if (!input) {
-    console.error('请指定版本类型 (patch/minor/major) 或具体版本号');
-    process.exit(1);
-  }
-
-  // 如果是具体的版本号
-  if (/^\d+\.\d+\.\d+/.test(input)) {
-    return input;
-  }
-
-  const parts = current.split('.').map(Number);
-
-  switch (input) {
-    case 'patch':
-      parts[2] += 1;
-      break;
-    case 'minor':
-      parts[1] += 1;
-      parts[2] = 0;
-      break;
-    case 'major':
-      parts[0] += 1;
-      parts[1] = 0;
-      parts[2] = 0;
-      break;
-    default:
-      console.error(`未知的版本类型: ${input}`);
-      process.exit(1);
-  }
-
-  return parts.join('.');
-}
-
 // 更新 package.json 版本
 async function updateVersion(packagePath, newVersion) {
   const content = await fs.readFile(packagePath, 'utf-8');
@@ -69,16 +36,11 @@ async function updateVersion(packagePath, newVersion) {
   const oldVersion = pkg.version;
   pkg.version = newVersion;
   await fs.writeFile(packagePath, JSON.stringify(pkg, null, 2) + '\n');
-  console.log(`  ${packagePath}: ${oldVersion} -> ${newVersion}`);
+  console.log(`  ${path.relative(rootDir, packagePath)}: ${oldVersion} -> ${newVersion}`);
 }
 
 // 获取变更内容
-async function getChanges(cliMessage) {
-  if (cliMessage) {
-    return cliMessage;
-  }
-
-  // 从命令行交互输入
+async function getChanges() {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -116,29 +78,24 @@ async function updateChangelog(newVersion, changes) {
   }
 
   await fs.writeFile(changelogPath, content);
-  console.log(`  ${changelogPath}: 添加版本 ${newVersion} 变更记录`);
+  console.log(`  CHANGELOG.md: 添加版本 ${newVersion} 变更记录`);
 }
 
 // 主函数
 async function main() {
-  const args = process.argv.slice(2);
-  const versionType = args[0];
+  // npm version 会将新版本作为第一个参数传入
+  const newVersion = process.env.npm_package_version || process.argv[2];
 
-  // 解析 --message 参数
-  let message = '';
-  const messageIndex = args.indexOf('--message');
-  if (messageIndex !== -1 && args[messageIndex + 1]) {
-    message = args[messageIndex + 1];
+  if (!newVersion || !/^\d+\.\d+\.\d+/.test(newVersion)) {
+    console.log('用法: npm version [patch|minor|major|x.y.z]');
+    console.log('或者直接使用 npm version 命令，此脚本会自动同步子包版本');
+    process.exit(0);
   }
 
   const currentVersion = await getCurrentVersion();
-  const newVersion = getNewVersion(currentVersion, versionType);
 
-  console.log(`\n版本升级: ${currentVersion} -> ${newVersion}\n`);
+  console.log(`\n同步版本: ${currentVersion} -> ${newVersion}\n`);
   console.log('更新文件:');
-
-  // 更新根 package.json
-  await updateVersion(path.join(rootDir, 'package.json'), newVersion);
 
   // 更新 packages/frps/package.json
   await updateVersion(path.join(rootDir, 'packages', 'frps', 'package.json'), newVersion);
@@ -147,15 +104,10 @@ async function main() {
   await updateVersion(path.join(rootDir, 'packages', 'frpc', 'package.json'), newVersion);
 
   // 获取并更新 CHANGELOG
-  const changes = await getChanges(message);
+  const changes = await getChanges();
   await updateChangelog(newVersion, changes);
 
-  console.log('\n版本更新完成！\n');
-  console.log('提示: 使用以下命令提交更改:');
-  console.log(`  git add -A`);
-  console.log(`  git commit -m "chore: bump version to ${newVersion}"`);
-  console.log(`  git push origin main`);
-  console.log(`\n推送后将自动触发发布流程`);
+  console.log('\n版本同步完成！');
 }
 
 main().catch(console.error);

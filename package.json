@@ -16,7 +16,8 @@
     "test:coverage": "vitest --coverage",
     "lint": "eslint packages/*/src",
     "format": "prettier --write \"packages/*/src/**/*.ts\"",
-    "version": "node scripts/version.js"
+    "version": "node scripts/version.js",
+    "postversion": "git push origin main && git push origin --tags"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
