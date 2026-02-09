@@ -201,7 +201,18 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: platform-packages
-          path: packages/frps-*/** packages/frpc-**/
+          path: |
+            packages/frps-linux-x64
+            packages/frps-linux-arm64
+            packages/frps-win32-x64
+            packages/frps-darwin-x64
+            packages/frps-darwin-arm64
+            packages/frpc-linux-x64
+            packages/frpc-linux-arm64
+            packages/frpc-win32-x64
+            packages/frpc-darwin-x64
+            packages/frpc-darwin-arm64
+          if-no-files-found: error
 
   # 构建并发布到 npm
   publish:
