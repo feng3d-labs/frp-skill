@@ -48,15 +48,18 @@ jobs:
         run: |
           VERSION="${{ steps.check.outputs.new-version }}"
           # 从 CHANGELOG.md 中提取当前版本的变更内容
-          python3 << 'EOF'
+          python3 << EOF
           import re
           import sys
+          import os
+
+          version = os.environ.get('VERSION', '0.0.1')
 
           with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
               content = f.read()
 
           # 查找当前版本的章节
-          pattern = rf'## \[{re.escape(VERSION)}\].*?\n(.*?)(?=\n## \[|$)'
+          pattern = rf'## \[{re.escape(version)}\].*?\n(.*?)(?=\n## \[|$)'
           match = re.search(pattern, content, re.DOTALL)
 
           if match:
@@ -67,8 +70,10 @@ jobs:
                   changes = changes[:10000] + '...'
               print(f'<<EOF_CONTENT\n{changes}\nEOF_CONTENT', end='')
           else:
-              print(f'## [{VERSION}]\n\n请查看 [CHANGELOG](https://github.com/feng3d-labs/frp-skill/blob/main/CHANGELOG.md) 获取完整变更记录。', end='')
+              print(f'## [{version}]\n\n请查看 [CHANGELOG](https://github.com/feng3d-labs/frp-skill/blob/main/CHANGELOG.md) 获取完整变更记录。', end='')
           EOF
+        env:
+          VERSION: ${{ steps.check.outputs.new-version }}
 
   # 发布前测试 - 在所有平台验证
   test:
