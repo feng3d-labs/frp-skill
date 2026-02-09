@@ -187,7 +187,15 @@ jobs:
           done
 
       - name: List uploaded files
-        run: ls -la packages/
+        run: |
+          echo "=== packages 目录结构 ==="
+          ls -la packages/
+          echo ""
+          echo "=== frps-linux-x64 内容 ==="
+          ls -la packages/frps-linux-x64/ || echo "目录为空或不存在"
+          echo ""
+          echo "=== frpc-linux-x64 内容 ==="
+          ls -la packages/frpc-linux-x64/ || echo "目录为空或不存在"
 
       - name: Upload binaries artifacts
         uses: actions/upload-artifact@v4
