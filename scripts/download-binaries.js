@@ -61,12 +61,11 @@ async function extractTar(tarballPath, destDir) {
  * 解压 zip 文件 (Windows)
  */
 async function extractZip(zipPath, destDir) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { Extract } = await import('unzipper') as any;
+  const unzipper = await import('unzipper');
   await fs.mkdir(destDir, { recursive: true });
   await pipeline(
     createReadStream(zipPath),
-    Extract({ path: destDir })
+    unzipper.Extract({ path: destDir })
   );
 }
 

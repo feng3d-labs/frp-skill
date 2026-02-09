@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import path from 'path';
 import fs from 'fs/promises';
-import { execaCommand } from 'execa';
+import { execa } from 'execa';
 import { createServer } from 'http';
 import { getRandomPort, waitForPort } from './helpers.js';
 
@@ -66,6 +66,8 @@ describe('frp 端口转发 E2E 测试', () => {
     testServerPort = await getRandomPort();
     remotePort = await getRandomPort();
 
+    console.log(`测试端口配置: frps=${frpsPort}, testServer=${testServerPort}, remote=${remotePort}`);
+
     // 创建一个简单的测试 HTTP 服务器
     testServer = createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -75,6 +77,8 @@ describe('frp 端口转发 E2E 测试', () => {
     await new Promise<void>((resolve) => {
       testServer.listen(testServerPort, () => resolve());
     });
+
+    console.log(`测试 HTTP 服务器已启动，端口: ${testServerPort}`);
 
     // 生成 frps 配置
     const frpsConfig = `bindPort = ${frpsPort}
@@ -93,6 +97,10 @@ localPort = ${testServerPort}
 remotePort = ${remotePort}
 `;
     await fs.writeFile(frpcConfigPath, frpcConfig);
+
+    console.log(`配置文件已生成:
+  - frps: ${frpsConfigPath}
+  - frpc: ${frpcConfigPath}`);
   }, 30000);
 
   afterAll(async () => {
@@ -132,42 +140,73 @@ remotePort = ${remotePort}
   }, 30000);
 
   it('应该能够启动 frps 服务端', async () => {
-    // 启动 frps
-    frpsProcess = execaCommand(`"${frpsBinary}" -c "${frpsConfigPath}"`, {
-      stdio: 'pipe',
+    console.log(`启动 frps: ${frpsBinary} -c ${frpsConfigPath}`);
+
+    // 启动 frps，捕获输出以便调试
+    frpsProcess = execa(frpsBinary, ['-c', frpsConfigPath], {
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+
+    // 监听输出以进行调试
+    frpsProcess.stdout?.on('data', (data: Buffer) => {
+      console.log('frps stdout:', data.toString());
+    });
+
+    frpsProcess.stderr?.on('data', (data: Buffer) => {
+      console.log('frps stderr:', data.toString());
     });
 
     // 等待 frps 启动
     await waitForPort(frpsPort, 10000);
 
     expect(frpsProcess.pid).toBeGreaterThan(0);
-    console.log(`frps 已启动，PID: ${frpsProcess.pid}，端口: ${frpsPort}`);
-  }, 15000);
+    console.log(`✓ frps 已启动，PID: ${frpsProcess.pid}，端口: ${frpsPort}`);
+  }, 20000);
 
   it('应该能够启动 frpc 客户端', async () => {
+    console.log(`启动 frpc: ${frpcBinary} -c ${frpcConfigPath}`);
+
     // 启动 frpc
-    frpcProcess = execaCommand(`"${frpcBinary}" -c "${frpcConfigPath}"`, {
-      stdio: 'pipe',
+    frpcProcess = execa(frpcBinary, ['-c', frpcConfigPath], {
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+
+    // 监听输出
+    frpcProcess.stdout?.on('data', (data: Buffer) => {
+      console.log('frpc stdout:', data.toString());
+    });
+
+    frpcProcess.stderr?.on('data', (data: Buffer) => {
+      console.log('frpc stderr:', data.toString());
     });
 
     // 等待 frpc 连接
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    // 检查进程是否还在运行
+    if (frpsProcess.exitCode !== null && frpsProcess.exitCode !== 0) {
+      throw new Error(`frps 进程已退出，代码: ${frpsProcess.exitCode}`);
+    }
+    if (frpcProcess.exitCode !== null && frpcProcess.exitCode !== 0) {
+      throw new Error(`frpc 进程已退出，代码: ${frpcProcess.exitCode}`);
+    }
 
     expect(frpcProcess.pid).toBeGreaterThan(0);
-    console.log(`frpc 已启动，PID: ${frpcProcess.pid}`);
+    console.log(`✓ frpc 已启动，PID: ${frpcProcess.pid}`);
   }, 15000);
 
   it('应该能够通过转发端口访问本地服务器', async () => {
     // 等待连接建立
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     // 尝试通过转发端口访问
+    console.log(`尝试访问: http://127.0.0.1:${remotePort}`);
     const response = await fetch(`http://127.0.0.1:${remotePort}`);
     const text = await response.text();
 
     expect(text).toBe('Hello from test server!');
     expect(response.status).toBe(200);
-    console.log(`成功通过转发端口 ${remotePort} 访问本地服务器`);
+    console.log(`✓ 成功通过转发端口 ${remotePort} 访问本地服务器`);
   }, 15000);
 
   it('应该支持多个并发连接', async () => {
@@ -182,7 +221,7 @@ remotePort = ${remotePort}
       const text = await response.text();
       expect(text).toBe('Hello from test server!');
     }
-    console.log('成功处理 10 个并发连接');
+    console.log('✓ 成功处理 10 个并发连接');
   }, 15000);
 
   it('应该正确转发 POST 请求', async () => {
@@ -195,7 +234,7 @@ remotePort = ${remotePort}
     });
 
     expect(response.status).toBe(200);
-    console.log('POST 请求转发成功');
+    console.log('✓ POST 请求转发成功');
   }, 10000);
 
   it('应该正确转发自定义 HTTP 头', async () => {
@@ -207,6 +246,6 @@ remotePort = ${remotePort}
     });
 
     expect(response.status).toBe(200);
-    console.log('自定义 HTTP 头转发成功');
+    console.log('✓ 自定义 HTTP 头转发成功');
   }, 10000);
 });
