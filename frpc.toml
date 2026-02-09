@@ -1,0 +1,9 @@
+serverAddr = "li.feng3d.com"
+serverPort = 7000
+
+[[proxies]]
+name = "local-http"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 12345
+remotePort = 12345
