@@ -119,3 +119,26 @@ export async function extractTar(tarballPath: string, destDir: string): Promise<
 
   return path.join(destDir, frpDir);
 }
+
+export async function extractZip(zipPath: string, destDir: string): Promise<string> {
+  await fs.mkdir(destDir, { recursive: true });
+
+  // 使用动态导入 unzipper
+  const { Extract } = await import('unzipper');
+  const { createReadStream } = await import('fs');
+  const { pipeline } = await import('stream/promises');
+
+  await pipeline(
+    createReadStream(zipPath),
+    Extract({ path: destDir })
+  );
+
+  // 查找解压后的目录
+  const files = await fs.readdir(destDir);
+  const frpDir = files.find(f => f.startsWith('frp_'));
+  if (!frpDir) {
+    throw new Error('未找到解压后的 frp 目录');
+  }
+
+  return path.join(destDir, frpDir);
+}

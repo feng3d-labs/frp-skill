@@ -8,15 +8,16 @@ const program = new Command();
 
 program
   .name('frps')
-  .description('frp 服务端部署工具 - 一键部署 frps 到 Linux 服务器')
+  .description('frp 服务端部署工具 - 支持 Linux/Windows/macOS')
   .version('1.0.0');
 
 // 默认命令：npx @feng3d/frps -p 7000
 program
   .option('-p, --port <port>', '绑定端口', '7000')
   .option('--frp-version <version>', 'frp 版本', '0.67.0')
-  .option('-d, --dir <dir>', '安装目录', '/usr/local/bin')
-  .option('--config-dir <dir>', '配置目录', '/etc/frp')
+  .option('-d, --dir <dir>', '安装目录')
+  .option('--config-dir <dir>', '配置目录')
+  .option('--no-service', '不创建系统服务')
   .action(async (options) => {
     try {
       await install(options);
@@ -32,8 +33,9 @@ program
   .description('安装 frps 服务端')
   .option('-p, --port <port>', '绑定端口', '7000')
   .option('--frp-version <version>', 'frp 版本', '0.67.0')
-  .option('-d, --dir <dir>', '安装目录', '/usr/local/bin')
-  .option('--config-dir <dir>', '配置目录', '/etc/frp')
+  .option('-d, --dir <dir>', '安装目录')
+  .option('--config-dir <dir>', '配置目录')
+  .option('--no-service', '不创建系统服务')
   .action(async (options) => {
     try {
       await install(options);
