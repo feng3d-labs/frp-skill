@@ -147,6 +147,8 @@ jobs:
 
             # 移动二进制到对应平台包目录
             frp_dir=$(find . -maxdepth 1 -type d -name "frp_*" | head -1)
+            echo "解压目录: $frp_dir"
+            ls -la "$frp_dir"
 
             case "$platform" in
               linux-amd64)
