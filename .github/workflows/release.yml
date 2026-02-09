@@ -253,6 +253,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify platform packages after npm ci
+        run: |
+          echo "=== npm ci 后验证平台包目录 ==="
+          for pkg in packages/frps-* packages/frpc-*; do
+            if [ -d "$pkg" ] && [ "$pkg" != "packages/frps" ] && [ "$pkg" != "packages/frpc" ]; then
+              echo "--- $pkg ---"
+              ls -la "$pkg" || echo "目录为空"
+            fi
+          done
+
       - name: Build packages
         run: npm run build
 

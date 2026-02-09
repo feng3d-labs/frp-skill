@@ -1,6 +1,6 @@
 {
   "name": "@feng3d/frps",
-  "version": "0.67.2",
+  "version": "0.67.3",
   "description": "frp 服务端部署工具 - 支持 Linux/Windows/macOS",
   "type": "module",
   "main": "./dist/index.js",

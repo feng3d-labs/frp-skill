@@ -1,6 +1,6 @@
 {
   "name": "@feng3d/frpc",
-  "version": "0.67.2",
+  "version": "0.67.3",
   "description": "frp 客户端部署工具 - 支持 Linux/Windows/macOS",
   "type": "module",
   "main": "./dist/index.js",
