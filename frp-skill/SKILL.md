@@ -7,11 +7,13 @@ description: 部署 frp (fatedier/frp) 实现内网穿透，将本地服务暴�
 
 将本地服务（如 `http://127.0.0.1:端口`）通过公网服务器暴露，实现公网访问（如 `http://example.com:端口`）。
 
+本技能使用 npm 包 `@feng3d/frps` 和 `@feng3d/frpc` 实现一键部署。
+
 ## 工作流程
 
 1. 收集用户参数
 2. 在公网 Linux 服务器上部署 frps（服务端）
-3. 在本地 Windows 机器上部署 frpc（客户端）
+3. 在本地 Windows/macOS 机器上部署 frpc（客户端）
 4. 验证连通性
 
 ## 第一步：收集参数
@@ -20,72 +22,107 @@ description: 部署 frp (fatedier/frp) 实现内网穿透，将本地服务暴�
 - `SERVER_ADDR` — 公网服务器域名或 IP（如 `li.feng3d.com`）
 - `LOCAL_PORT` — 本地服务端口（如 `12345`）
 - `REMOTE_PORT` — 公网暴露端口（通常与 LOCAL_PORT 相同）
-- `LOCAL_IP` — 本地服务 IP（默认 `127.0.0.1`）
+- `TOKEN` — 认证令牌（可选，建议设置）
 
 ## 第二步：部署服务端（Linux）
 
-在公网服务器上运行 `scripts/setup_frps.sh`，一键完成下载、配置、防火墙和 systemd 设置：
+在公网服务器上使用 npx 一键部署：
 
 ```bash
-bash setup_frps.sh <版本号> <公网端口>
-# 示例：bash setup_frps.sh 0.67.0 12345
+# 使用 npx 无需安装
+npx @feng3d/frps -p 7000
+
+# 带 token 认证
+npx @feng3d/frps -p 7000 -t your-secret-token
+
+# 全局安装后使用
+npm install -g @feng3d/frps
+frps -p 7000
 ```
 
-脚本会自动：
-- 下载 frps 到 `/usr/local/bin/`
-- 创建 `/etc/frp/frps.toml`，设置 `bindPort = 7000`
-- 开放防火墙端口（7000 + 公网端口）
-- 创建并启动 `frps.service`（故障自动重启、开机自启）
+命令会自动完成：
+- 下载对应平台的 frps 二进制文件
+- 创建配置文件
+- 配置防火墙 (firewalld/ufw)
+- 配置 systemd 服务（开机自启）
 
-如需手动配置，可参考 `assets/frps.toml` 模板。
+### 手动安装（备选）
 
-## 第三步：部署客户端（Windows）
+如果无法使用 npx，可使用项目脚本：
 
-### 重要：杀毒软件处理
+```bash
+bash scripts/setup_frps.sh 0.67.0 7000
+```
 
-Windows Defender 及其他杀毒软件（如火绒）**会自动删除 frpc.exe**，必须在下载前将部署目录加入白名单。
+## 第三步：部署客户端
 
-以**管理员身份**运行 `scripts/setup_frpc.ps1`，脚本会自动处理 Defender 排除、下载和解压：
+### Windows/macOS/Linux
+
+使用 npx 一键部署：
+
+```bash
+# 交互式配置向导
+npx @feng3d/frpc
+
+# 直接指定参数
+npx @feng3d/frpc --server li.feng3d.com --local-port 8080 --remote-port 8080
+
+# 带 token 认证
+npx @feng3d/frpc -s li.feng3d.com -l 8080 -r 8080 -t your-secret-token
+
+# 全局安装后使用
+npm install -g @feng3d/frpc
+frpc --server li.feng3d.com --local-port 8080 --remote-port 8080
+```
+
+### Windows 杀毒软件处理
+
+Windows Defender 可能拦截 frpc.exe。如果遇到此问题：
+1. 以管理员身份运行 PowerShell
+2. 添加 Defender 排除：
+   ```powershell
+   Add-MpPreference -ExclusionPath "$env:USERPROFILE\frp"
+   ```
+
+### 手动安装（备选）
+
+如果无法使用 npx，可使用项目脚本：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File setup_frpc.ps1 -Version "0.67.0" -Dest "C:\部署目录"
+# Windows
+powershell -ExecutionPolicy Bypass -File scripts/setup_frpc.ps1 -Version "0.67.0" -Dest "$env:USERPROFILE\frp"
 ```
 
-如果脚本无法自动添加排除（如使用非 Defender 杀毒软件），需指导用户先手动将目录加入杀毒软件白名单/信任区。
-
-### 创建 frpc.toml
-
-用 `assets/frpc.toml` 作为模板，替换占位符：
+使用 `assets/frpc.toml` 作为配置模板：
 
 ```toml
-serverAddr = "SERVER_ADDR"
+serverAddr = "li.feng3d.com"
 serverPort = 7000
 
 [[proxies]]
-name = "PROXY_NAME"
+name = "myapp"
 type = "tcp"
 localIP = "127.0.0.1"
-localPort = LOCAL_PORT
-remotePort = REMOTE_PORT
+localPort = 8080
+remotePort = 8080
 ```
-
-### 启动客户端
-
-```cmd
-.\frpc.exe -c frpc.toml
-```
-
-看到 `start proxy success` 表示连接成功。
 
 ## 第四步：验证
 
-浏览器访问 `http://SERVER_ADDR:REMOTE_PORT`。
+浏览器访问 `http://SERVER_ADDR:REMOTE_PORT`，成功访问本地服务即表示配置正确。
 
 ## 常见问题
 
 | 现象 | 原因 | 解决方法 |
 |------|------|----------|
-| frpc.exe 下载后消失 | 杀毒软件拦截删除 | 先将目录加入白名单，再重新下载 |
-| 连接服务器 7000 端口被拒绝 | 防火墙未开放 | 开放服务器防火墙 7000 端口，检查云厂商安全组 |
-| 公网端口无响应 | 防火墙未开放 | 开放 REMOTE_PORT，检查云厂商安全组 |
-| 连接本地服务失败 | 本地服务未运行 | 确认本地服务正在运行且 LOCAL_IP:LOCAL_PORT 正确 |
+| npx 命令未找到 | 未安装 Node.js | 安装 Node.js 18+ |
+| frpc.exe 被删除 | 杀毒软件拦截 | 将目录加入杀毒软件白名单 |
+| 连接服务器被拒绝 | 防火墙未开放 | 开放服务器 7000 端口和远程端口 |
+| 公网端口无响应 | 云厂商安全组 | 检查云控制台安全组规则 |
+| 本地服务连接失败 | 本地服务未运行 | 确认本地服务正在运行 |
+
+## 更多信息
+
+- [@feng3d/frps](https://www.npmjs.com/package/@feng3d/frps) - 服务端包文档
+- [@feng3d/frpc](https://www.npmjs.com/package/@feng3d/frpc) - 客户端包文档
+- [frp 官方文档](https://github.com/fatedier/frp)

@@ -1,36 +1,64 @@
-# frp-skill
+# @feng3d/frp-monorepo
 
-使用 [frp](https://github.com/fatedier/frp) 实现内网穿透的 Claude Code Skill，将本地服务暴露到公网访问。
+frp 内网穿透工具的 npm 包集合，提供便捷的命令行工具快速部署 frp 服务端和客户端。
 
-## 安装
+## 包列表
+
+- **[@feng3d/frps](./packages/frps/)** - frp 服务端部署工具
+- **[@feng3d/frpc](./packages/frpc/)** - frp 客户端部署工具
+
+## 快速开始
+
+### 服务端 (frps)
 
 ```bash
-npx skills add wardenfeng/frp-skill
+# 使用 npx 直接运行，无需安装
+npx @feng3d/frps -p 7000
+
+# 或全局安装后使用
+npm install -g @feng3d/frps
+frps -p 7000
 ```
 
-## 功能
+### 客户端 (frpc)
 
-- 一键部署 frps 服务端（Linux）
-- 一键部署 frpc 客户端（Windows），自动处理杀毒软件拦截问题
-- 提供 frpc.toml / frps.toml 配置模板
+```bash
+# 使用 npx 直接运行
+npx @feng3d/frpc --server example.com --local-port 8080 --remote-port 8080
 
-## 使用示例
+# 或全局安装后使用
+npm install -g @feng3d/frpc
+frpc --server example.com --local-port 8080 --remote-port 8080
+```
 
-安装 skill 后，在 Claude Code 中直接描述需求即可：
+## Claude Code Skill
+
+本仓库同时也是 [Claude Code](https://claude.com/claude-code) 的 Skill，可以通过以下方式安装：
+
+```bash
+npx skills add feng3d-labs/frp-skill
+```
+
+安装后可以在 Claude Code 中直接描述需求，例如：
 
 > 帮我把本地 http://127.0.0.1:8080 通过 my-server.com 暴露到公网
 
-Claude 会自动调用此 skill，引导完成服务端和客户端的部署配置。
+## 开发
 
-## 目录结构
+```bash
+# 安装依赖
+npm install
 
+# 构建所有包
+npm run build
+
+# 运行测试
+npm test
+
+# 运行 E2E 测试
+npm run test:e2e
 ```
-frp-skill/
-├── SKILL.md                    # 技能描述和工作流程
-├── scripts/
-│   ├── setup_frpc.ps1          # Windows 客户端部署脚本
-│   └── setup_frps.sh           # Linux 服务端部署脚本
-└── assets/
-    ├── frpc.toml               # 客户端配置模板
-    └── frps.toml               # 服务端配置模板
-```
+
+## 许可证
+
+MIT

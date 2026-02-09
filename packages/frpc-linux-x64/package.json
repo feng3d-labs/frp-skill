@@ -1,0 +1,12 @@
+{
+  "name": "@feng3d/frpc-linux-x64",
+  "version": "0.0.1",
+  "description": "frpc linux x64 二进制文件",
+  "type": "module",
+  "main": "./frpc",
+  "author": "feng3d",
+  "license": "MIT",
+  "files": [
+    "frpc"
+  ]
+}

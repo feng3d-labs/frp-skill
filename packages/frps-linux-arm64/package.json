@@ -1,0 +1,12 @@
+{
+  "name": "@feng3d/frps-linux-arm64",
+  "version": "0.0.1",
+  "description": "frps linux arm64 二进制文件",
+  "type": "module",
+  "main": "./frps",
+  "author": "feng3d",
+  "license": "MIT",
+  "files": [
+    "frps"
+  ]
+}

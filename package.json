@@ -1,20 +1,41 @@
 {
-  "name": "frp_test",
-  "version": "1.0.0",
-  "description": "使用 [frp](https://github.com/fatedier/frp) 实现内网穿透的 Claude Code Skill，将本地服务暴露到公网访问。",
-  "main": "index.js",
+  "name": "@feng3d/frp-monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "description": "frp 内网穿透 npm 包集合",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "postinstall": "node scripts/download-binaries.mjs",
+    "build": "npm run build --workspace=@feng3d/frps --workspace=@feng3d/frpc",
+    "dev": "npm run dev --workspace=@feng3d/frps --workspace=@feng3d/frpc",
+    "prepublishOnly": "npm run build",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint packages/*/src",
+    "format": "prettier --write \"packages/*/src/**/*.ts\"",
+    "clean": "git clean -fdX",
+    "version": "node scripts/version.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/tar": "^6.1.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.6.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "tar": "^6.0.0",
+    "unzipper": "^0.12.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wardenfeng/frp-skill.git"
+    "url": "git+https://github.com/feng3d-labs/frp-skill.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/wardenfeng/frp-skill/issues"
-  },
-  "homepage": "https://github.com/wardenfeng/frp-skill#readme"
+  "author": "feng3d",
+  "license": "MIT"
 }

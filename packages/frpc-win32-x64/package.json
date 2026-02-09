@@ -1,0 +1,12 @@
+{
+  "name": "@feng3d/frpc-win32-x64",
+  "version": "0.0.1",
+  "description": "frpc windows x64 二进制文件",
+  "type": "module",
+  "main": "./frpc.exe",
+  "author": "feng3d",
+  "license": "MIT",
+  "files": [
+    "frpc.exe"
+  ]
+}

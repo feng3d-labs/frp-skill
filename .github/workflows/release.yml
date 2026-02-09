@@ -1,0 +1,302 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # 检查是否有新的未发布版本
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should-publish: ${{ steps.check.outputs.should-publish }}
+      new-version: ${{ steps.check.outputs.new-version }}
+      current-tag: ${{ steps.check.outputs.current-tag }}
+      changelog: ${{ steps.changelog.outputs.content }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version
+        id: check
+        run: |
+          # 获取 package.json 中的版本
+          VERSION=$(node -p "require('./package.json').version")
+          echo "new-version=$VERSION" >> $GITHUB_OUTPUT
+
+          # 检查是否已存在对应的 tag
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "current-tag=v$VERSION" >> $GITHUB_OUTPUT
+            echo "should-publish=false" >> $GITHUB_OUTPUT
+            echo "版本 v$VERSION 已发布，跳过"
+          else
+            echo "current-tag=none" >> $GITHUB_OUTPUT
+            echo "should-publish=true" >> $GITHUB_OUTPUT
+            echo "发现新版本 v$VERSION，准备发布"
+          fi
+
+      - name: Extract changelog
+        id: changelog
+        if: steps.check.outputs.should-publish == 'true'
+        run: |
+          VERSION="${{ steps.check.outputs.new-version }}"
+          # 从 CHANGELOG.md 中提取当前版本的变更内容
+          python3 << 'EOF'
+          import re
+          import sys
+
+          with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
+              content = f.read()
+
+          # 查找当前版本的章节
+          pattern = rf'## \[{re.escape(VERSION)}\].*?\n(.*?)(?=\n## \[|$)'
+          match = re.search(pattern, content, re.DOTALL)
+
+          if match:
+              # 提取并清理内容
+              changes = match.group(1).strip()
+              # 限制长度
+              if len(changes) > 10000:
+                  changes = changes[:10000] + '...'
+              print(f'<<EOF_CONTENT\n{changes}\nEOF_CONTENT', end='')
+          else:
+              print(f'## [{VERSION}]\n\n请查看 [CHANGELOG](https://github.com/feng3d-labs/frp-skill/blob/main/CHANGELOG.md) 获取完整变更记录。', end='')
+          EOF
+
+  # 发布前测试 - 在所有平台验证
+  test:
+    needs: check-version
+    if: needs.check-version.outputs.should-publish == 'true'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [20.x]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Cache frp binaries
+        uses: actions/cache@v4
+        with:
+          path: binaries
+          key: frp-${{ runner.os }}-0.67.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run all tests
+        run: npm test
+
+      - name: Run E2E tests
+        run: npx vitest --run test/e2e.test.ts
+        timeout-minutes: 15
+
+  # 准备平台包的二进制文件
+  prepare-binaries:
+    needs: [check-version, test]
+    if: needs.check-version.outputs.should-publish == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download frp binaries
+        run: |
+          VERSION="${{ needs.check-version.outputs.new-version }}"
+
+          # 下载 frps 二进制文件
+          for platform in linux-amd64 linux-arm64 windows-amd64 darwin-amd64 darwin-arm64; do
+            IFS='-' read -r _ p_ext <<< "$platform"
+            [ "$p_ext" = "amd64" ] && platform_name="${platform/amd64/x64}" || platform_name="$platform"
+
+            case "$platform" in
+              linux-*) ext="tar.gz" ;;
+              windows-*) ext="zip" ;;
+              darwin-*) ext="tar.gz" ;;
+            esac
+
+            url="https://github.com/fatedier/frp/releases/download/v${VERSION}/frp_${VERSION}_${platform}.${ext}"
+            echo "下载 $url"
+
+            if [ "$ext" = "tar.gz" ]; then
+              curl -sL "$url" | tar xz
+            else
+              curl -sL "$url" -o frp.zip && unzip -q frp.zip
+            fi
+
+            # 移动二进制到对应平台包目录
+            frp_dir=$(find . -maxdepth 1 -type d -name "frp_*" | head -1)
+
+            case "$platform" in
+              linux-amd64)
+                mkdir -p packages/frps-linux-x64
+                cp "$frp_dir/frps" packages/frps-linux-x64/
+                mkdir -p packages/frpc-linux-x64
+                cp "$frp_dir/frpc" packages/frpc-linux-x64/
+                ;;
+              linux-arm64)
+                mkdir -p packages/frps-linux-arm64
+                cp "$frp_dir/frps" packages/frps-linux-arm64/
+                mkdir -p packages/frpc-linux-arm64
+                cp "$frp_dir/frpc" packages/frpc-linux-arm64/
+                ;;
+              windows-amd64)
+                mkdir -p packages/frps-win32-x64
+                cp "$frp_dir/frps.exe" packages/frps-win32-x64/
+                mkdir -p packages/frpc-win32-x64
+                cp "$frp_dir/frpc.exe" packages/frpc-win32-x64/
+                ;;
+              darwin-amd64)
+                mkdir -p packages/frps-darwin-x64
+                cp "$frp_dir/frps" packages/frps-darwin-x64/
+                mkdir -p packages/frpc-darwin-x64
+                cp "$frp_dir/frpc" packages/frpc-darwin-x64/
+                ;;
+              darwin-arm64)
+                mkdir -p packages/frps-darwin-arm64
+                cp "$frp_dir/frps" packages/frps-darwin-arm64/
+                mkdir -p packages/frpc-darwin-arm64
+                cp "$frp_dir/frpc" packages/frpc-darwin-arm64/
+                ;;
+            esac
+
+            rm -rf "$frp_dir" frp.zip
+          done
+
+      - name: Upload binaries artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-packages
+          path: packages/frps-*/** packages/frpc-**/
+
+  # 构建并发布到 npm
+  publish:
+    needs: [check-version, test, prepare-binaries]
+    if: needs.check-version.outputs.should-publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: platform-packages
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages
+        run: npm run build
+
+      # 发布主包
+      - name: Publish @feng3d/frps
+        run: cd packages/frps && npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @feng3d/frpc
+        run: cd packages/frpc && npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # 发布平台包
+      - name: Publish platform packages
+        run: |
+          for pkg in packages/frps-* packages/frpc-*; do
+            if [ -f "$pkg/package.json" ]; then
+              echo "发布 $pkg"
+              cd "$pkg"
+              npm publish --provenance --access public || echo "警告: $pkg 发布失败"
+              cd -
+            fi
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # 创建 GitHub Tag 和 Release
+  release:
+    needs: [check-version, publish]
+    if: needs.check-version.outputs.should-publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ needs.check-version.outputs.new-version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.check-version.outputs.new-version }}
+          release_name: Release v${{ needs.check-version.outputs.new-version }}
+          body: |
+            ## @feng3d/frps 和 @feng3d/frpc ${{ needs.check-version.outputs.new-version }}
+
+            ${{ needs.check-version.outputs.changelog }}
+
+            ### 安装
+            ```bash
+            # 服务端
+            npx @feng3d/frps -p 7000
+
+            # 客户端
+            npx @feng3d/frpc --server example.com --local-port 8080 --remote-port 8080
+            ```
+
+            ### 平台包
+            平台包包含预编译的二进制文件，适用于国内网络环境：
+            - @feng3d/frps-linux-x64 / @feng3d/frpc-linux-x64
+            - @feng3d/frps-linux-arm64 / @feng3d/frpc-linux-arm64
+            - @feng3d/frps-win32-x64 / @feng3d/frpc-win32-x64
+            - @feng3d/frps-darwin-x64 / @feng3d/frpc-darwin-x64
+            - @feng3d/frps-darwin-arm64 / @feng3d/frpc-darwin-arm64
+          draft: false
+          prerelease: false
