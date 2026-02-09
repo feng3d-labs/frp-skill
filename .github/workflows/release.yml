@@ -2,20 +2,79 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version (e.g. 1.0.0)'
-        required: true
 
 permissions:
   contents: read
 
 jobs:
+  # 检查是否有新的未发布版本
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should-publish: ${{ steps.check.outputs.should-publish }}
+      new-version: ${{ steps.check.outputs.new-version }}
+      current-tag: ${{ steps.check.outputs.current-tag }}
+      changelog: ${{ steps.changelog.outputs.content }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version
+        id: check
+        run: |
+          # 获取 package.json 中的版本
+          VERSION=$(node -p "require('./package.json').version")
+          echo "new-version=$VERSION" >> $GITHUB_OUTPUT
+
+          # 检查是否已存在对应的 tag
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "current-tag=v$VERSION" >> $GITHUB_OUTPUT
+            echo "should-publish=false" >> $GITHUB_OUTPUT
+            echo "版本 v$VERSION 已发布，跳过"
+          else
+            echo "current-tag=none" >> $GITHUB_OUTPUT
+            echo "should-publish=true" >> $GITHUB_OUTPUT
+            echo "发现新版本 v$VERSION，准备发布"
+          fi
+
+      - name: Extract changelog
+        id: changelog
+        if: steps.check.outputs.should-publish == 'true'
+        run: |
+          VERSION="${{ steps.check.outputs.new-version }}"
+          # 从 CHANGELOG.md 中提取当前版本的变更内容
+          # 查找从 ## [$VERSION] 到下一个 ## [ 之间的内容
+          python3 << 'EOF'
+          import re
+          import sys
+
+          with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
+              content = f.read()
+
+          # 查找当前版本的章节
+          pattern = rf'## \[{re.escape(VERSION)}\].*?\n(.*?)(?=\n## \[|$)'
+          match = re.search(pattern, content, re.DOTALL)
+
+          if match:
+              # 提取并清理内容
+              changes = match.group(1).strip()
+              # 限制长度
+              if len(changes) > 10000:
+                  changes = changes[:10000] + '...'
+              print(f'<<EOF_CONTENT\n{changes}\nEOF_CONTENT', end='')
+          else:
+              print(f'## [{VERSION}]\n\n请查看 [CHANGELOG](https://github.com/wardenfeng/frp-skill/blob/main/CHANGELOG.md) 获取完整变更记录。', end='')
+          EOF
+
   # 发布前测试 - 在所有平台验证
   test:
+    needs: check-version
+    if: needs.check-version.outputs.should-publish == 'true'
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -57,7 +116,8 @@ jobs:
 
   # 构建并发布到 npm
   publish:
-    needs: test
+    needs: [check-version, test]
+    if: needs.check-version.outputs.should-publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -89,9 +149,10 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  # 创建 GitHub Release
+  # 创建 GitHub Tag 和 Release
   release:
-    needs: publish
+    needs: [check-version, publish]
+    if: needs.check-version.outputs.should-publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -99,20 +160,29 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get version from tag
-        id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Create and push tag
+        run: |
+          VERSION="${{ needs.check-version.outputs.new-version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
 
       - name: Create Release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: v${{ needs.check-version.outputs.new-version }}
+          release_name: Release v${{ needs.check-version.outputs.new-version }}
           body: |
-            ## @feng3d/frps 和 @feng3d/frpc ${{ steps.version.outputs.version }}
+            ## @feng3d/frps 和 @feng3d/frpc ${{ needs.check-version.outputs.new-version }}
+
+            ${{ needs.check-version.outputs.changelog }}
 
             ### 安装
             ```bash
@@ -122,8 +192,5 @@ jobs:
             # 客户端
             npx @feng3d/frpc --server example.com --local-port 8080 --remote-port 8080
             ```
-
-            ### 变更
-            查看 [CHANGELOG](https://github.com/wardenfeng/frp-skill/blob/main/CHANGELOG.md)
           draft: false
           prerelease: false
