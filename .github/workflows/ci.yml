@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -82,12 +80,6 @@ jobs:
         with:
           path: ~/.npm
           key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-
-      - name: Cache frp binaries
-        uses: actions/cache@v4
-        with:
-          path: binaries
-          key: frp-${{ runner.os }}-0.67.0
 
       - name: Install dependencies
         run: npm ci

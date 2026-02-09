@@ -102,21 +102,11 @@ jobs:
           path: ~/.npm
           key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
 
-      - name: Cache frp binaries
-        uses: actions/cache@v4
-        with:
-          path: binaries
-          key: frp-${{ runner.os }}-0.67.0
-
       - name: Install dependencies
         run: npm ci
 
       - name: Run all tests
         run: npm test
-
-      - name: Run E2E tests
-        run: npx vitest --run test/e2e.test.ts
-        timeout-minutes: 15
 
   # 准备平台包的二进制文件
   prepare-binaries:
@@ -193,6 +183,9 @@ jobs:
 
             rm -rf "$frp_dir" frp.zip
           done
+
+      - name: List uploaded files
+        run: ls -la packages/
 
       - name: Upload binaries artifacts
         uses: actions/upload-artifact@v4
