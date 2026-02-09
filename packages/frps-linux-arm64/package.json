@@ -1,6 +1,6 @@
 {
   "name": "@feng3d/frps-linux-arm64",
-  "version": "0.67.0",
+  "version": "0.67.1",
   "description": "frps linux arm64 二进制文件",
   "type": "module",
   "main": "./frps",
