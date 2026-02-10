@@ -4,7 +4,6 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageDir = path.resolve(__dirname, '..');
-const workspaceRoot = path.resolve(packageDir, '..');
 
 export interface PlatformInfo {
   platform: NodeJS.Platform;
@@ -17,13 +16,29 @@ export interface PlatformInfo {
 export interface DownloadOptions {
   version: string;
   platform?: NodeJS.Platform;
-  arch?: string;
+  arch: string;
   destDir: string;
 }
 
 export function getPlatformInfo(): PlatformInfo {
-  const platform = process.platform;
-  const arch = process.arch;
+  // 支持通过环境变量强制指定平台（用于 Git Bash/MinGW 环境）
+  const envPlatform = process.env.FRPS_PLATFORM || process.env.FRPC_PLATFORM || process.env.PLATFORM;
+  let platform: NodeJS.Platform = process.platform;
+  let arch = process.arch;
+
+  // 如果设置了环境变量，使用指定的平台
+  if (envPlatform) {
+    platform = envPlatform as NodeJS.Platform;
+  }
+
+  // 在 Git Bash/MinGW 环境中，process.platform 可能是 'linux'，但实际在 Windows 上
+  // 检测 Windows 的其他方式
+  if (platform === 'linux') {
+    // 检查是否有 Windows 系统路径
+    if (process.env.WINDIR || process.env.COMSPEC?.includes('Windows') || process.env.PATH?.includes('\\')) {
+      platform = 'win32';
+    }
+  }
 
   return {
     platform,
@@ -52,9 +67,34 @@ export async function getBinaryPath(platform: NodeJS.Platform, arch: string): Pr
   const binaryName = platform === 'win32' ? 'frps.exe' : 'frps';
   const platformPackageName = getPlatformPackageName(platform, arch);
 
-  // 从 node_modules 中查找平台包
-  const platformPkgPath = path.join(workspaceRoot, 'node_modules', platformPackageName, binaryName);
+  // 尝试多个可能的路径来找到平台包
+  const possiblePaths = [
+    // 同级 @feng3d namespace 目录 (最常见的 npx/npm 安装方式)
+    path.join(path.dirname(packageDir), platformPackageName, binaryName),
+    // 包的 node_modules 中
+    path.join(packageDir, 'node_modules', platformPackageName, binaryName),
+    // 传统 node_modules 结构
+    path.join(packageDir, '..', 'node_modules', platformPackageName, binaryName),
+    // 从当前目录向上查找 node_modules
+    path.resolve(process.cwd(), 'node_modules', platformPackageName, binaryName),
+    // 额外的兜底路径
+    path.join(packageDir, '..', '..', '..', 'node_modules', platformPackageName, binaryName),
+  ];
 
-  await fs.access(platformPkgPath);
-  return platformPkgPath;
+  for (const testPath of possiblePaths) {
+    try {
+      await fs.access(testPath);
+      return testPath;
+    } catch {
+      // 继续尝试下一个路径
+    }
+  }
+
+  // 如果所有路径都失败，抛出错误
+  throw new Error(
+    `无法找到平台包 ${platformPackageName} 中的二进制文件 ${binaryName}\n` +
+    `已尝试的路径:\n${possiblePaths.map(p => '  - ' + p).join('\n')}\n\n` +
+    `提示: 如果在 Git Bash/MinGW 中使用，请设置环境变量:\n` +
+    `  export FRPS_PLATFORM=win32`
+  );
 }

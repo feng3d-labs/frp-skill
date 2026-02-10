@@ -57,6 +57,19 @@ async function updateVersion(packagePath, newVersion) {
   const pkg = JSON.parse(content);
   const oldVersion = pkg.version;
   pkg.version = newVersion;
+
+  // 如果是主包 (frps 或 frpc)，也更新 optionalDependencies
+  if (packagePath === 'packages/frps' || packagePath === 'packages/frpc') {
+    if (pkg.optionalDependencies) {
+      const prefix = packagePath === 'packages/frps' ? '@feng3d/frps-' : '@feng3d/frpc-';
+      for (const key of Object.keys(pkg.optionalDependencies)) {
+        if (key.startsWith(prefix)) {
+          pkg.optionalDependencies[key] = newVersion;
+        }
+      }
+    }
+  }
+
   await fs.writeFile(fullPath, JSON.stringify(pkg, null, 2) + '\n');
   console.log(`  ${packagePath}: ${oldVersion} -> ${newVersion}`);
 }

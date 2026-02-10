@@ -1,6 +1,6 @@
 {
   "name": "@feng3d/frpc-darwin-arm64",
-  "version": "0.67.3",
+  "version": "0.68.1",
   "description": "frpc darwin arm64 二进制文件",
   "type": "module",
   "main": "./frpc",
