@@ -45,3 +45,6 @@ temp_download/
 
 # Legacy binaries directory
 binaries/
+.plan
+.gitignore
+.temp

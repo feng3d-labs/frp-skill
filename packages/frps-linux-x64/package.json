@@ -1,6 +1,6 @@
 {
   "name": "@feng3d/frps-linux-x64",
-  "version": "0.68.1",
+  "version": "0.68.2",
   "description": "frps linux x64 二进制文件",
   "type": "module",
   "main": "./frps",

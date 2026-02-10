@@ -1,6 +1,6 @@
 {
   "name": "@feng3d/frp-monorepo",
-  "version": "0.67.2",
+  "version": "0.68.2",
   "private": true,
   "description": "frp 内网穿透 npm 包集合",
   "workspaces": [
@@ -22,12 +22,12 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/tar": "^6.1.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.0.0",
-    "vitest": "^1.6.0",
     "@vitest/coverage-v8": "^1.6.0",
     "tar": "^6.0.0",
-    "unzipper": "^0.12.0"
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "unzipper": "^0.12.0",
+    "vitest": "^1.6.0"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -37,5 +37,8 @@
     "url": "git+https://github.com/feng3d-labs/frp-skill.git"
   },
   "author": "feng3d",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@feng3d/frpc": "^0.68.1"
+  }
 }

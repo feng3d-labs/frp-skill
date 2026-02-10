@@ -1,6 +1,6 @@
 {
   "name": "@feng3d/frpc-win32-x64",
-  "version": "0.68.1",
+  "version": "0.68.2",
   "description": "frpc windows x64 二进制文件",
   "type": "module",
   "main": "./frpc.exe",
