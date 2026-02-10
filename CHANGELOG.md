@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.68.2] - 2026-02-10
+
+### Changed
+- 版本更新
+
 ## [0.68.1] - 2026-02-10
 
 ### Changed
