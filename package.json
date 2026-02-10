@@ -7,7 +7,6 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "node scripts/download-binaries.mjs",
     "build": "npm run build --workspace=@feng3d/frps --workspace=@feng3d/frpc",
     "dev": "npm run dev --workspace=@feng3d/frps --workspace=@feng3d/frpc",
     "prepublishOnly": "npm run build",
@@ -20,9 +19,11 @@
     "version": "node scripts/version.mjs"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^20.0.0",
     "@types/tar": "^6.1.0",
     "@vitest/coverage-v8": "^1.6.0",
+    "adm-zip": "^0.5.16",
     "tar": "^6.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",

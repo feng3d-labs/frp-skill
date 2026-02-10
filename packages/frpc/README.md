@@ -12,6 +12,10 @@ npm install -g @feng3d/frpc
 npx @feng3d/frpc
 ```
 
+## 工作原理
+
+首次运行时自动从 [GitHub Releases](https://github.com/fatedier/frp/releases) 下载对应平台的 frp 二进制文件，并缓存到系统临时目录，后续使用无需重复下载。
+
 ## 使用
 
 ### 快速连接
@@ -37,7 +41,6 @@ frpc --server example.com --local-port 3000 --remote-port 3000-3005
 | `--remote-port` | `-r` | | 远程端口 |
 | `--proxy-name` | `-n` | | 代理名称 |
 | `--token` | `-t` | | 认证令牌 |
-| `--frp-version` | | `0.67.0` | frp 二进制版本 |
 | `--type` | | `tcp` | 代理类型 (tcp/http/https) |
 
 ### 子命令

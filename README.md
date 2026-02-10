@@ -1,4 +1,4 @@
-# @feng3d/frp-monorepo
+# @feng3d/frp-skill
 
 frp 内网穿透工具的 npm 包集合，提供便捷的命令行工具快速部署 frp 服务端和客户端。
 
@@ -31,6 +31,15 @@ npm install -g @feng3d/frpc
 frpc --server example.com --local-port 8080 --remote-port 8080
 ```
 
+## 工作原理
+
+包首次运行时会自动从 [GitHub Releases](https://github.com/fatedier/frp/releases) 下载对应平台的 frp 二进制文件，并缓存到系统临时目录，后续使用无需重复下载。
+
+支持的平台：
+- Linux x64/arm64
+- Windows x64
+- macOS x64/arm64
+
 ## Claude Code Skill
 
 本仓库同时也是 [Claude Code](https://claude.com/claude-code) 的 Skill，可以通过以下方式安装：
@@ -54,9 +63,6 @@ npm run build
 
 # 运行测试
 npm test
-
-# 运行 E2E 测试
-npm run test:e2e
 ```
 
 ## 许可证

@@ -2,10 +2,13 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
-import { execaCommand } from 'execa';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageDir = path.resolve(__dirname, '..');
+
+const FRP_VERSION = '0.67.0';
+// 缓存目录，用于存储下载的二进制文件
+const CACHE_DIR = path.join(os.tmpdir(), '@feng3d-frps');
 
 export interface PlatformInfo {
   platform: NodeJS.Platform;
@@ -15,16 +18,9 @@ export interface PlatformInfo {
   isMac: boolean;
 }
 
-export interface DownloadOptions {
-  version: string;
-  platform?: NodeJS.Platform;
-  arch: string;
-  destDir: string;
-}
-
 export function getPlatformInfo(): PlatformInfo {
   // 支持通过环境变量强制指定平台（用于 Git Bash/MinGW 环境）
-  const envPlatform = process.env.FRPS_PLATFORM || process.env.FRPC_PLATFORM || process.env.PLATFORM;
+  const envPlatform = process.env.FRPS_PLATFORM || process.env.PLATFORM;
   let platform: NodeJS.Platform = process.platform;
   let arch = process.arch;
 
@@ -51,166 +47,160 @@ export function getPlatformInfo(): PlatformInfo {
   };
 }
 
-export function getPlatformPackageName(platform: NodeJS.Platform, arch: string): string {
-  const platformName = platform;
-  const archName = arch === 'arm64' ? 'arm64' : 'x64';
-  return `@feng3d/frps-${platformName}-${archName}`;
+/**
+ * 获取缓存的二进制文件路径
+ */
+function getCachedBinaryPath(platform: NodeJS.Platform, arch: string): string {
+  const platformName = platform === 'win32' ? 'windows' : platform;
+  const archName = arch === 'arm64' ? 'arm64' : 'amd64';
+  const binaryName = platform === 'win32' ? 'frps.exe' : 'frps';
+  return path.join(CACHE_DIR, `${platformName}-${archName}`, binaryName);
 }
 
 /**
- * 获取命名空间名称（从包路径中提取 @feng3d）
+ * 下载文件
  */
-function getNamespaceName(): string {
-  const parentDir = path.dirname(packageDir);
-  const basename = path.basename(parentDir);
-  // 如果父目录是 @feng3d，直接返回；否则向上查找
-  if (basename.startsWith('@')) {
-    return basename;
+async function downloadFile(url: string, destPath: string): Promise<void> {
+  console.log(`正在从 GitHub 下载: ${url}`);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`下载失败: ${response.status} ${response.statusText}`);
   }
-  // 尝试从 packageDir 向上查找 @scope 目录
-  const parts = packageDir.split(path.sep);
-  for (let i = parts.length - 1; i >= 0; i--) {
-    if (parts[i].startsWith('@')) {
-      return parts[i];
-    }
-  }
-  return '@feng3d'; // 默认值
+
+  const buffer = await response.arrayBuffer();
+  await fs.writeFile(destPath, Buffer.from(buffer));
+  console.log(`下载完成`);
 }
 
 /**
- * 从 npm registry 下载平台包的 tarball
+ * 解压 tar.gz 文件
  */
-async function downloadPlatformPackage(platformPackageName: string): Promise<Buffer> {
-  // 使用 npm pack 下载 tarball 到临时目录
-  const tmpDir = os.tmpdir();
-  const tempDownloadDir = path.join(tmpDir, `npm-download-${Date.now()}`);
-  await fs.mkdir(tempDownloadDir, { recursive: true });
-
-  try {
-    // 使用 npm pack 下载包
-    await execaCommand(`npm pack ${platformPackageName}`, {
-      cwd: tempDownloadDir,
-      stdio: 'pipe'
-    });
-
-    // 查找下载的 tarball 文件
-    // npm pack 会把 @feng3d/xxx 转换为 feng3d-xxx-version.tgz
-    const files = await fs.readdir(tempDownloadDir);
-    const tarballFile = files.find(f => f.endsWith('.tgz'));
-
-    if (!tarballFile) {
-      throw new Error(`下载的 tarball 文件未找到`);
-    }
-
-    const tarballPath = path.join(tempDownloadDir, tarballFile);
-    const tarballBuffer = await fs.readFile(tarballPath);
-
-    // 清理临时文件
-    await fs.rm(tempDownloadDir, { recursive: true, force: true });
-
-    return tarballBuffer;
-  } catch (error) {
-    // 清理临时文件
-    await fs.rm(tempDownloadDir, { recursive: true, force: true }).catch(() => {});
-    throw error;
-  }
-}
-
-/**
- * 从 tarball 中提取二进制文件到临时目录
- */
-async function extractBinaryFromTarball(tarballBuffer: Buffer, binaryName: string): Promise<string> {
-  const tmpDir = os.tmpdir();
-  const extractDir = path.join(tmpDir, `frps-${Date.now()}`);
-
-  await fs.mkdir(extractDir, { recursive: true });
-
-  // 使用 tar 提取
-  const { extract: tarExtract } = await import('tar');
-  const { Readable } = await import('stream');
-
-  return new Promise((resolve, reject) => {
-    const stream = Readable.from(tarballBuffer);
-    stream.pipe(
-      tarExtract({
-        cwd: extractDir,
-        strip: 1 // 去掉 'package/' 前缀
-      }, [binaryName])
-    ).on('error', reject).on('end', () => {
-      const extractedPath = path.join(extractDir, binaryName);
-      resolve(extractedPath);
-    });
+async function extractTar(tarballPath: string, destDir: string): Promise<void> {
+  const tar = await import('tar');
+  await fs.mkdir(destDir, { recursive: true });
+  await tar.extract({
+    file: tarballPath,
+    cwd: destDir
   });
 }
 
 /**
- * 获取平台包中的二进制文件路径
- *
- * 统一使用 npm 平台包中的二进制文件：
- * - npm 镜像缓存，下载更快
- * - 避免直接访问 GitHub（国内网络友好）
- * - 平台包通过 optionalDependencies 自动安装
- *
- * 如果平台包不存在，会自动从 npm registry 下载
+ * 解压 zip 文件 (Windows)
+ * 使用 adm-zip 而不是 unzipper，因为 unzipper 包含 AWS SDK 依赖会导致打包问题
  */
-export async function getBinaryPath(platform: NodeJS.Platform, arch: string): Promise<string> {
+async function extractZip(zipPath: string, destDir: string): Promise<void> {
+  const AdmZip = (await import('adm-zip')).default;
+  await fs.mkdir(destDir, { recursive: true });
+  const zip = new AdmZip(zipPath);
+  zip.extractAllTo(destDir, true);
+}
+
+/**
+ * 从 GitHub 下载并提取二进制文件
+ */
+async function downloadFromGitHub(platform: NodeJS.Platform, arch: string): Promise<string> {
   const binaryName = platform === 'win32' ? 'frps.exe' : 'frps';
-  const platformPackageName = getPlatformPackageName(platform, arch);
+  const platformName = platform === 'win32' ? 'windows' : platform;
+  const archName = arch === 'arm64' ? 'arm64' : 'amd64';
+  const ext = platform === 'win32' ? 'zip' : 'tar.gz';
 
-  // 获取父级命名空间目录名称（如 @feng3d）
-  const namespaceName = getNamespaceName();
+  // 缓存路径
+  const cachePath = getCachedBinaryPath(platform, arch);
 
-  // 尝试多个可能的路径来找到平台包
-  const possiblePaths = [
-    // 同级 @feng3d namespace 目录 (最常见的 npx/npm 安装方式)
-    path.join(path.dirname(packageDir), platformPackageName, binaryName),
-    // 包的 node_modules 中
-    path.join(packageDir, 'node_modules', platformPackageName, binaryName),
-    // 传统 node_modules 结构
-    path.join(packageDir, '..', 'node_modules', platformPackageName, binaryName),
-    // 从当前目录向上查找 node_modules
-    path.resolve(process.cwd(), 'node_modules', platformPackageName, binaryName),
-    // 嵌套命名空间路径: node_modules/@feng3d/@feng3d/frps-PLATFORM-ARCH
-    path.join(path.dirname(packageDir), namespaceName, platformPackageName, binaryName),
-    path.join(packageDir, 'node_modules', namespaceName, platformPackageName, binaryName),
-    path.join(packageDir, '..', 'node_modules', namespaceName, platformPackageName, binaryName),
-    path.resolve(process.cwd(), 'node_modules', namespaceName, platformPackageName, binaryName),
-    // 额外的兜底路径
-    path.join(packageDir, '..', '..', '..', 'node_modules', platformPackageName, binaryName),
-    path.join(packageDir, '..', '..', '..', 'node_modules', namespaceName, platformPackageName, binaryName),
-  ];
-
-  for (const testPath of possiblePaths) {
-    try {
-      await fs.access(testPath);
-      return testPath;
-    } catch {
-      // 继续尝试下一个路径
-    }
+  // 检查缓存
+  try {
+    await fs.access(cachePath);
+    console.log(`使用缓存的二进制文件: ${cachePath}`);
+    return cachePath;
+  } catch {
+    // 缓存不存在，需要下载
   }
 
-  // 所有路径都失败，尝试从 npm 下载平台包
-  console.warn(`平台包 ${platformPackageName} 未找到，正在从 npm 下载...`);
+  console.warn(`正在下载 frps ${platformName}-${archName}...`);
+
+  // 下载 URL
+  const baseUrl = `https://github.com/fatedier/frp/releases/download/v${FRP_VERSION}`;
+  const tarballUrl = `${baseUrl}/frp_${FRP_VERSION}_${platformName}_${archName}.${ext}`;
+
+  // 下载到临时目录
+  const tempDownloadDir = path.join(os.tmpdir(), `frps-download-${Date.now()}`);
+  await fs.mkdir(tempDownloadDir, { recursive: true });
+
+  const tarballPath = path.join(tempDownloadDir, `frps.${ext}`);
+  await downloadFile(tarballUrl, tarballPath);
+
+  // 解压
+  console.log('正在解压...');
+  const extractDir = path.join(tempDownloadDir, 'extracted');
+
+  if (ext === 'zip') {
+    await extractZip(tarballPath, extractDir);
+  } else {
+    await extractTar(tarballPath, extractDir);
+  }
+
+  // 找到解压后的目录
+  const files = await fs.readdir(extractDir);
+  const frpDir = files.find(f => f.startsWith('frp_'));
+
+  if (!frpDir) {
+    throw new Error('未找到解压后的 frp 目录');
+  }
+
+  const binaryDir = path.join(extractDir, frpDir);
+  const extractedPath = path.join(binaryDir, binaryName);
+
+  // 确保缓存目录存在
+  await fs.mkdir(path.dirname(cachePath), { recursive: true });
+
+  // 复制到缓存目录
+  await fs.copyFile(extractedPath, cachePath);
+
+  // 添加执行权限 (非 Windows)
+  if (platform !== 'win32') {
+    await fs.chmod(cachePath, 0o755);
+  }
+
+  // 清理临时目录
+  await fs.rm(tempDownloadDir, { recursive: true, force: true });
+
+  console.log(`✓ frps ${platformName}-${archName} 下载完成`);
+  return cachePath;
+}
+
+/**
+ * 获取 frps 二进制文件路径
+ *
+ * 统一从 GitHub Releases 下载二进制文件：
+ * - 使用系统缓存目录存储下载的文件
+ * - 避免重复下载
+ * - 支持所有平台
+ */
+export async function getBinaryPath(platform?: NodeJS.Platform, arch?: string): Promise<string> {
+  const platformInfo = getPlatformInfo();
+  const targetPlatform = platform || platformInfo.platform;
+  const targetArch = arch || platformInfo.arch;
+
+  const binaryName = targetPlatform === 'win32' ? 'frps.exe' : 'frps';
 
   try {
-    const tarballBuffer = await downloadPlatformPackage(platformPackageName);
-    const extractedPath = await extractBinaryFromTarball(tarballBuffer, binaryName);
-    console.warn(`已从 npm 下载 ${platformPackageName} 到临时目录`);
-    return extractedPath;
+    return await downloadFromGitHub(targetPlatform, targetArch);
   } catch (downloadError: unknown) {
     const errorMessage = downloadError instanceof Error ? downloadError.message : String(downloadError);
-    // 下载也失败，抛出详细错误
     throw new Error(
-      `无法找到平台包 ${platformPackageName} 中的二进制文件 ${binaryName}\n` +
-      `已尝试的路径:\n${possiblePaths.map(p => '  - ' + p).join('\n')}\n\n` +
-      `从 npm 下载也失败: ${errorMessage}\n\n` +
+      `无法获取 frps 二进制文件 (${targetPlatform} ${targetArch})\n` +
+      `从 GitHub 下载失败: ${errorMessage}\n\n` +
       `调试信息:\n` +
       `  packageDir: ${packageDir}\n` +
-      `  namespaceName: ${namespaceName}\n` +
-      `  platformPackageName: ${platformPackageName}\n` +
-      `  current cwd: ${process.cwd()}\n\n` +
+      `  目标平台: ${targetPlatform}\n` +
+      `  目标架构: ${targetArch}\n` +
+      `  二进制文件名: ${binaryName}\n` +
+      `  缓存目录: ${CACHE_DIR}\n\n` +
       `提示: 如果在 Git Bash/MinGW 中使用，请设置环境变量:\n` +
-      `  export FRPS_PLATFORM=win32`
+      `  export FRPS_PLATFORM=win32\n\n` +
+      `提示: 您也可以手动从以下地址下载:\n` +
+      `  https://github.com/fatedier/frp/releases/v${FRP_VERSION}`
     );
   }
 }

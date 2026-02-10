@@ -12,6 +12,10 @@ npm install -g @feng3d/frps
 npx @feng3d/frps
 ```
 
+## 工作原理
+
+首次运行时自动从 [GitHub Releases](https://github.com/fatedier/frp/releases) 下载对应平台的 frp 二进制文件，并缓存到系统临时目录，后续使用无需重复下载。
+
 ## 使用
 
 ### 快速启动
@@ -22,9 +26,6 @@ frps
 
 # 指定端口启动
 frps -p 8080
-
-# 指定 frp 版本
-frps --frp-version 0.67.0
 ```
 
 ### 命令选项
@@ -32,7 +33,6 @@ frps --frp-version 0.67.0
 | 选项 | 别名 | 默认值 | 说明 |
 |------|------|--------|------|
 | `--port` | `-p` | `7000` | 绑定端口 |
-| `--frp-version` | | `0.67.0` | frp 二进制版本 |
 | `--no-service` | | `false` | 不注册为系统服务 |
 | `--token` | `-t` | | 认证令牌 |
 

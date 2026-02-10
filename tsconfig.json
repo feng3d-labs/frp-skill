@@ -13,5 +13,6 @@
     "declaration": true,
     "outDir": "./dist"
   },
+  "include": ["packages/*/src/**/*.ts", "packages/*/src/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
