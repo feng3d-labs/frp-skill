@@ -8,13 +8,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wardenfeng/frp-skill.git"
+    "url": "git+https://github.com/feng3d-labs/frp-skill.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/wardenfeng/frp-skill/issues"
+    "url": "https://github.com/feng3d-labs/frp-skill/issues"
   },
-  "homepage": "https://github.com/wardenfeng/frp-skill#readme"
+  "homepage": "https://github.com/feng3d-labs/frp-skill#readme"
 }

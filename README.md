@@ -5,7 +5,7 @@
 ## 安装
 
 ```bash
-npx skills add wardenfeng/frp-skill
+npx skills add feng3d-labs/frp-skill
 ```
 
 ## 功能
