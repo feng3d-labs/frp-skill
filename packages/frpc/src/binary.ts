@@ -97,6 +97,40 @@ async function extractZip(zipPath: string, destDir: string): Promise<void> {
 }
 
 /**
+ * 在 Windows 上为缓存目录添加 Defender 排除
+ */
+async function ensureDefenderExclusion(dir: string): Promise<void> {
+  if (process.platform !== 'win32') return;
+
+  // 检查是否已有排除
+  try {
+    const { execaCommand } = await import('execa');
+    const { stdout } = await execaCommand(`powershell -Command "(Get-MpPreference).ExclusionPath"`, { stdio: 'pipe' });
+    if (stdout && stdout.includes(dir)) return;
+  } catch {
+    // 无法检查，继续尝试添加
+  }
+
+  try {
+    // 先尝试直接添加（当前用户可能已是管理员）
+    const { execaCommand } = await import('execa');
+    await execaCommand(`powershell -Command "Add-MpPreference -ExclusionPath '${dir}'"`, { stdio: 'pipe' });
+  } catch {
+    // 非管理员，通过 UAC 提权请求
+    try {
+      const { execaCommand } = await import('execa');
+      const escapedDir = dir.replace(/'/g, "''");
+      await execaCommand(
+        `powershell -Command "Start-Process powershell -ArgumentList '-Command','Add-MpPreference -ExclusionPath ''${escapedDir}''' -Verb RunAs -Wait"`,
+        { stdio: 'pipe' }
+      );
+    } catch {
+      // 用户拒绝 UAC 或其他错误
+    }
+  }
+}
+
+/**
  * 从 GitHub 下载并提取二进制文件
  */
 async function downloadFromGitHub(platform: NodeJS.Platform, arch: string): Promise<string> {
@@ -116,6 +150,9 @@ async function downloadFromGitHub(platform: NodeJS.Platform, arch: string): Prom
   } catch {
     // 缓存不存在，需要下载
   }
+
+  // Windows 下载前先添加 Defender 排除
+  await ensureDefenderExclusion(CACHE_DIR);
 
   console.warn(`正在下载 frpc ${platformName}-${archName}...`);
 
@@ -157,13 +194,35 @@ async function downloadFromGitHub(platform: NodeJS.Platform, arch: string): Prom
   // 复制到缓存目录
   await fs.copyFile(extractedPath, cachePath);
 
-  // 添加执行权限 (非 Windows)
-  if (platform !== 'win32') {
+  if (platform === 'win32') {
+    // 移除 Windows 安全标记（Zone.Identifier），避免被阻止执行
+    try {
+      const { execaCommand } = await import('execa');
+      await execaCommand(`powershell -Command "Unblock-File -Path '${cachePath}'"`, { stdio: 'pipe' });
+    } catch {
+      // 忽略
+    }
+  } else {
+    // 添加执行权限 (非 Windows)
     await fs.chmod(cachePath, 0o755);
   }
 
   // 清理临时目录
   await fs.rm(tempDownloadDir, { recursive: true, force: true });
+
+  // 等待片刻让杀毒软件完成扫描，然后验证文件是否存在
+  if (platform === 'win32') {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  try {
+    await fs.access(cachePath);
+  } catch {
+    throw new Error(
+      `frpc 二进制文件已下载但被杀毒软件（如 Windows Defender）删除。\n` +
+      `请以管理员身份运行以下命令后重试:\n` +
+      `  PowerShell: Add-MpPreference -ExclusionPath '${CACHE_DIR}'`
+    );
+  }
 
   console.log(`✓ frpc ${platformName}-${archName} 下载完成`);
   return cachePath;

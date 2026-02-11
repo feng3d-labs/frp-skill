@@ -113,7 +113,7 @@ remotePort = ${remotePort}
     console.log(`配置文件已生成:
   - frps: ${frpsConfigPath}
   - frpc: ${frpcConfigPath}`);
-  }, 30000);
+  }, 120000);
 
   afterAll(async () => {
     // 优雅地清理所有进程
@@ -288,7 +288,7 @@ auth.token = "${testToken}"
     await fs.writeFile(frpsConfigPath, frpsConfig);
 
     console.log(`Token 认证测试配置: frps=${frpsPort}, token=${testToken}`);
-  }, 30000);
+  }, 120000);
 
   afterAll(async () => {
     // 优雅地清理所有进程
