@@ -54,66 +54,21 @@ describe('frp 端口转发 E2E 测试', () => {
   let frpsBinary: string;
   let frpcBinary: string;
 
-  /**
-   * 获取二进制文件路径
-   *
-   * 开发环境：直接使用 packages/ 目录下平台包中的二进制文件
-   * 生产环境：用户通过 npm 安装后，二进制文件在 node_modules/ 中
-   */
   async function getBinaryPaths(): Promise<{ frps: string; frpc: string }> {
-    const platform = process.platform;
-    const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
-    const binaryExt = platform === 'win32' ? '.exe' : '';
-    const frpsName = `frps${binaryExt}`;
-    const frpcName = `frpc${binaryExt}`;
+    const { getBinaryPath: getFrpsBinaryPath } = await import('../packages/frps/src/binary.js');
+    const { getBinaryPath: getFrpcBinaryPath } = await import('../packages/frpc/src/binary.js');
 
-    const { fileURLToPath } = await import('url');
-    const { dirname } = await import('path');
-    const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
+    const frpsPath = await getFrpsBinaryPath();
+    const frpcPath = await getFrpcBinaryPath();
 
-    // 平台包目录名
-    const frpsPlatformDir = `frps-${platform}-${arch}`;
-    const frpcPlatformDir = `frpc-${platform}-${arch}`;
-
-    // 优先使用 packages/ 目录中的二进制（开发环境）
-    let frpsPath = path.join(rootDir, 'packages', frpsPlatformDir, frpsName);
-    let frpcPath = path.join(rootDir, 'packages', frpcPlatformDir, frpcName);
-
-    // 检查 packages/ 是否存在
-    let usePackagesDir = false;
-    try {
-      await fs.access(frpsPath);
-      await fs.access(frpcPath);
-      usePackagesDir = true;
-    } catch {
-      // 尝试 node_modules/
-      frpsPath = path.join(rootDir, 'node_modules', `@feng3d`, frpsPlatformDir, frpsName);
-      frpcPath = path.join(rootDir, 'node_modules', `@feng3d`, frpcPlatformDir, frpcName);
-    }
-
-    // 检查二进制文件是否存在
-    try {
-      await fs.access(frpsPath);
-      await fs.access(frpcPath);
-      const location = usePackagesDir ? 'packages/' : 'node_modules/';
-      console.log(`使用平台包二进制文件 (${location}):\n  frps: ${frpsPlatformDir}\n  frpc: ${frpcPlatformDir}`);
-      return { frps: frpsPath, frpc: frpcPath };
-    } catch (err) {
-      throw new Error(
-        `平台包二进制文件未找到。\n` +
-        `请确保已运行 'npm install' 下载二进制文件。\n` +
-        `期望路径:\n` +
-        `  - ${path.join(rootDir, 'packages', frpsPlatformDir, frpsName)}\n` +
-        `  - ${path.join(rootDir, 'packages', frpcPlatformDir, frpcName)}\n` +
-        `错误: ${(err as Error).message}`
-      );
-    }
+    console.log(`使用 GitHub 下载的二进制文件:\n  frps: ${frpsPath}\n  frpc: ${frpcPath}`);
+    return { frps: frpsPath, frpc: frpcPath };
   }
 
   beforeAll(async () => {
     await fs.mkdir(tempDir, { recursive: true });
 
-    // 获取二进制文件路径
+    // 获取二进制文件路径（从 GitHub 下载或使用缓存）
     const paths = await getBinaryPaths();
     frpsBinary = paths.frps;
     frpcBinary = paths.frpc;
@@ -307,42 +262,14 @@ describe('frp Token 认证 E2E 测试', () => {
   let frpsBinary: string;
   let frpcBinary: string;
 
-  /**
-   * 获取二进制文件路径
-   *
-   * 开发环境：直接使用 packages/ 目录下平台包中的二进制文件
-   * 生产环境：用户通过 npm 安装后，二进制文件在 node_modules/ 中
-   */
   async function getBinaryPaths(): Promise<{ frps: string; frpc: string }> {
-    const platform = process.platform;
-    const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
-    const binaryExt = platform === 'win32' ? '.exe' : '';
-    const frpsName = `frps${binaryExt}`;
-    const frpcName = `frpc${binaryExt}`;
+    const { getBinaryPath: getFrpsBinaryPath } = await import('../packages/frps/src/binary.js');
+    const { getBinaryPath: getFrpcBinaryPath } = await import('../packages/frpc/src/binary.js');
 
-    const { fileURLToPath } = await import('url');
-    const { dirname } = await import('path');
-    const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
+    const frpsPath = await getFrpsBinaryPath();
+    const frpcPath = await getFrpcBinaryPath();
 
-    // 平台包目录名
-    const frpsPlatformDir = `frps-${platform}-${arch}`;
-    const frpcPlatformDir = `frpc-${platform}-${arch}`;
-
-    // 优先使用 packages/ 目录中的二进制（开发环境）
-    let frpsPath = path.join(rootDir, 'packages', frpsPlatformDir, frpsName);
-    let frpcPath = path.join(rootDir, 'packages', frpcPlatformDir, frpcName);
-
-    // 检查 packages/ 是否存在
-    try {
-      await fs.access(frpsPath);
-      await fs.access(frpcPath);
-      return { frps: frpsPath, frpc: frpcPath };
-    } catch {
-      // 尝试 node_modules/
-      frpsPath = path.join(rootDir, 'node_modules', `@feng3d`, frpsPlatformDir, frpsName);
-      frpcPath = path.join(rootDir, 'node_modules', `@feng3d`, frpcPlatformDir, frpcName);
-      return { frps: frpsPath, frpc: frpcPath };
-    }
+    return { frps: frpsPath, frpc: frpcPath };
   }
 
   beforeAll(async () => {

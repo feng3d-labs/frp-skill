@@ -302,51 +302,5 @@ remotePort = 8000
       expect(platformCount).toBe(1);
     });
 
-    it('应该为当前平台返回正确的平台包名', async () => {
-      const { getPlatformPackageName, getPlatformInfo } = await import('../packages/frps/src/binary.js');
-
-      const platformInfo = getPlatformInfo();
-      const packageName = getPlatformPackageName(platformInfo.platform, platformInfo.arch);
-
-      expect(packageName).toMatch(/^@feng3d\/frps-/);
-      expect(packageName).toContain(platformInfo.platform === 'win32' ? 'win32' : platformInfo.platform);
-      expect(packageName).toContain(platformInfo.arch === 'arm64' ? 'arm64' : 'x64');
-    });
-  });
-
-  describe('Windows 平台特定测试', () => {
-    it('Windows 平台应使用正确的二进制文件名', async () => {
-      const { getPlatformPackageName } = await import('../packages/frps/src/binary.js');
-
-      const packageName = getPlatformPackageName('win32', 'x64');
-      expect(packageName).toBe('@feng3d/frps-win32-x64');
-
-      const armPackageName = getPlatformPackageName('win32', 'arm64');
-      expect(armPackageName).toBe('@feng3d/frps-win32-arm64');
-    });
-  });
-
-  describe('Linux 平台特定测试', () => {
-    it('Linux 平台应使用正确的二进制文件名', async () => {
-      const { getPlatformPackageName } = await import('../packages/frps/src/binary.js');
-
-      const packageName = getPlatformPackageName('linux', 'x64');
-      expect(packageName).toBe('@feng3d/frps-linux-x64');
-
-      const armPackageName = getPlatformPackageName('linux', 'arm64');
-      expect(armPackageName).toBe('@feng3d/frps-linux-arm64');
-    });
-  });
-
-  describe('macOS 平台特定测试', () => {
-    it('macOS 平台应使用正确的二进制文件名', async () => {
-      const { getPlatformPackageName } = await import('../packages/frps/src/binary.js');
-
-      const packageName = getPlatformPackageName('darwin', 'x64');
-      expect(packageName).toBe('@feng3d/frps-darwin-x64');
-
-      const armPackageName = getPlatformPackageName('darwin', 'arm64');
-      expect(armPackageName).toBe('@feng3d/frps-darwin-arm64');
-    });
   });
 });
